@@ -1,0 +1,142 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function memberPath(storeId, uid) {
+      return /databases/$(database)/documents/stores/$(storeId)/members/$(uid);
+    }
+
+    function isMember(storeId) {
+      return signedIn() && exists(memberPath(storeId, request.auth.uid));
+    }
+
+    function currentMember(storeId) {
+      return get(memberPath(storeId, request.auth.uid)).data;
+    }
+
+    function isStaff(storeId) {
+      return isMember(storeId)
+        && currentMember(storeId).role in ['admin', 'owner', 'employee'];
+    }
+
+    function canCreateBills(storeId) {
+      return isMember(storeId)
+        && isStaff(storeId)
+        && (currentMember(storeId).role in ['admin', 'owner']
+          || currentMember(storeId).canCreateBills == true);
+    }
+
+    function canViewAllOrders(storeId) {
+      return isStaff(storeId)
+        && (currentMember(storeId).role in ['admin', 'owner']
+          || currentMember(storeId).canShop == true
+          || currentMember(storeId).canCreateBills == true);
+    }
+
+    function canManageStock(storeId) {
+      return isMember(storeId)
+        && (currentMember(storeId).role in ['admin', 'owner']
+          || currentMember(storeId).canManageStock == true);
+    }
+
+    function canSeeBusiness(storeId) {
+      return isMember(storeId)
+        && currentMember(storeId).role in ['admin', 'owner'];
+    }
+
+    match /stores/{storeId}/members/{uid} {
+      allow get: if isMember(storeId)
+        && (request.auth.uid == uid || canSeeBusiness(storeId));
+      allow list: if isStaff(storeId)
+        && (currentMember(storeId).canCreateBills == true
+          || canSeeBusiness(storeId));
+      // Membership, permissions, and account creation are managed by
+      // authenticated Cloud Functions using the Admin SDK.
+      allow create, update, delete: if false;
+
+      match /tokens/{tokenId} {
+        allow read, write: if isMember(storeId) && request.auth.uid == uid;
+      }
+    }
+
+    match /stores/{storeId}/customers/{customerId} {
+      allow get, list: if canCreateBills(storeId) || canSeeBusiness(storeId);
+      allow create: if canCreateBills(storeId)
+        && request.resource.data.keys().hasOnly(['id', 'name', 'phone', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0;
+      allow update, delete: if canSeeBusiness(storeId);
+    }
+
+    match /stores/{storeId}/products/{productId} {
+      allow read: if isMember(storeId);
+      allow create, update, delete: if canManageStock(storeId);
+    }
+
+    match /stores/{storeId}/categories/{categoryId} {
+      allow read: if isMember(storeId);
+      allow create, update, delete: if canManageStock(storeId);
+    }
+
+    match /stores/{storeId}/business/{documentId} {
+      allow read: if isMember(storeId);
+      allow write: if canSeeBusiness(storeId);
+    }
+
+    match /stores/{storeId}/carts/{uid} {
+      allow read: if isMember(storeId)
+        && (request.auth.uid == uid || canCreateBills(storeId));
+      allow create, update, delete: if isMember(storeId)
+        && request.auth.uid == uid;
+    }
+
+    match /stores/{storeId}/orders/{orderId} {
+      allow get, list: if isMember(storeId)
+        && (canViewAllOrders(storeId)
+          || resource.data.customerUid == request.auth.uid);
+      // Orders are created through a stock-checking callable function.
+      allow create: if false;
+      allow update: if canCreateBills(storeId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'seenByStaff', 'statusUpdatedAt']);
+      allow delete: if false;
+    }
+
+    match /stores/{storeId}/bills/{billDocumentId} {
+      allow get, list: if isMember(storeId)
+        && (canCreateBills(storeId) || canSeeBusiness(storeId)
+          || resource.data.customerUid == request.auth.uid);
+      allow create, delete: if false;
+      allow update: if (canCreateBills(storeId) || canSeeBusiness(storeId))
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['payments', 'updatedAt']);
+    }
+
+    match /stores/{storeId}/pendingRequests/{requestId} {
+      allow get, list: if isMember(storeId)
+        && (canViewAllOrders(storeId)
+          || resource.data.customerUid == request.auth.uid);
+      allow create: if isMember(storeId)
+        && (request.resource.data.customerUid == request.auth.uid
+          || (canCreateBills(storeId)
+            && exists(memberPath(storeId, request.resource.data.customerUid))));
+      allow update: if canCreateBills(storeId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt']);
+      allow delete: if canSeeBusiness(storeId);
+    }
+
+    match /stores/{storeId}/productionTasks/{taskId} {
+      allow get, list: if isMember(storeId)
+        && (canSeeBusiness(storeId)
+          || resource.data.workerUid == request.auth.uid);
+      // Creation is limited to the store owner/admin. Status changes use a
+      // callable function that validates worker assignment and transitions.
+      allow create: if canSeeBusiness(storeId);
+      allow update, delete: if false;
+    }
+  }
+}
