@@ -98,6 +98,145 @@ exports.createStoreAccount = onCall({ region }, async (request) => {
   return { uid: userRecord.uid };
 });
 
+exports.submitStoreAccountApplication = onCall({ region }, async (request) => {
+  const storeId = String(request.data?.storeId ?? "").trim();
+  const name = String(request.data?.name ?? "").trim();
+  const uid = request.auth?.uid;
+  const email = String(request.auth?.token?.email ?? "").trim().toLowerCase();
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "Create an account before requesting store access.");
+  }
+  if (storeId !== "progressive-jewellery"
+      || !name || name.length > 120 || !email) {
+    throw new HttpsError("invalid-argument", "Enter your name and create an email account first.");
+  }
+
+  const userRecord = await getAuth().getUser(uid);
+  if (userRecord.disabled || userRecord.email?.toLowerCase() !== email) {
+    throw new HttpsError("permission-denied", "This sign-in cannot request store access.");
+  }
+
+  const memberRef = storeMemberRef(storeId, uid);
+  const applicationRef = db.doc(`stores/${storeId}/applications/${uid}`);
+  await db.runTransaction(async (transaction) => {
+    const [memberSnapshot, applicationSnapshot] = await Promise.all([
+      transaction.get(memberRef),
+      transaction.get(applicationRef),
+    ]);
+    if (memberSnapshot.exists) {
+      throw new HttpsError("already-exists", "This account already has store access.");
+    }
+    if (applicationSnapshot.exists
+        && applicationSnapshot.data().status === "pending") {
+      return;
+    }
+    transaction.set(applicationRef, {
+      uid,
+      name,
+      email,
+      status: "pending",
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return { status: "pending" };
+});
+
+exports.approveStoreAccountApplication = onCall({ region }, async (request) => {
+  const storeId = String(request.data?.storeId ?? "").trim();
+  const targetUid = String(request.data?.uid ?? "").trim();
+  if (!storeId || !targetUid) {
+    throw new HttpsError("invalid-argument", "A store account request is required.");
+  }
+  const caller = await requireCaller(request, storeId);
+  if (caller.role !== "admin") {
+    throw new HttpsError("permission-denied", "Only an admin can approve account access.");
+  }
+
+  const applicationRef = db.doc(`stores/${storeId}/applications/${targetUid}`);
+  const memberRef = storeMemberRef(storeId, targetUid);
+  const applicationSnapshot = await applicationRef.get();
+  if (!applicationSnapshot.exists
+      || applicationSnapshot.data().status !== "pending") {
+    throw new HttpsError("not-found", "This account request is no longer pending.");
+  }
+  const application = applicationSnapshot.data();
+  let userRecord;
+  try {
+    userRecord = await getAuth().getUser(targetUid);
+  } catch (_) {
+    throw new HttpsError("failed-precondition", "The applicant's sign-in account no longer exists.");
+  }
+  if (userRecord.disabled
+      || userRecord.email?.toLowerCase() !== String(application.email ?? "").toLowerCase()) {
+    throw new HttpsError("failed-precondition", "The applicant's sign-in account could not be verified.");
+  }
+
+  await db.runTransaction(async (transaction) => {
+    const [latestApplication, latestMember] = await Promise.all([
+      transaction.get(applicationRef),
+      transaction.get(memberRef),
+    ]);
+    if (!latestApplication.exists
+        || latestApplication.data().status !== "pending") {
+      throw new HttpsError("failed-precondition", "This account request is no longer pending.");
+    }
+    if (latestMember.exists) {
+      throw new HttpsError("already-exists", "This account already has store access.");
+    }
+    const data = latestApplication.data();
+    transaction.set(memberRef, {
+      uid: targetUid,
+      id: `CUS-${targetUid.toUpperCase()}`,
+      name: String(data.name ?? "Customer"),
+      email: String(data.email ?? userRecord.email ?? ""),
+      login: String(data.email ?? userRecord.email ?? ""),
+      role: "customer",
+      canShop: true,
+      canManageStock: false,
+      canCreateBills: false,
+      createdAt: FieldValue.serverTimestamp(),
+      approvedBy: request.auth.uid,
+      approvedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.update(applicationRef, {
+      status: "approved",
+      approvedBy: request.auth.uid,
+      approvedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  await getAuth().updateUser(targetUid, { displayName: String(application.name ?? "") });
+  return { uid: targetUid };
+});
+
+exports.rejectStoreAccountApplication = onCall({ region }, async (request) => {
+  const storeId = String(request.data?.storeId ?? "").trim();
+  const targetUid = String(request.data?.uid ?? "").trim();
+  if (!storeId || !targetUid) {
+    throw new HttpsError("invalid-argument", "A store account request is required.");
+  }
+  const caller = await requireCaller(request, storeId);
+  if (caller.role !== "admin") {
+    throw new HttpsError("permission-denied", "Only an admin can reject account access.");
+  }
+
+  const applicationRef = db.doc(`stores/${storeId}/applications/${targetUid}`);
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(applicationRef);
+    if (!snapshot.exists || snapshot.data().status !== "pending") {
+      throw new HttpsError("not-found", "This account request is no longer pending.");
+    }
+    transaction.update(applicationRef, {
+      status: "rejected",
+      rejectedBy: request.auth.uid,
+      rejectedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return { ok: true };
+});
+
 exports.updateStoreMember = onCall({ region }, async (request) => {
   const storeId = String(request.data?.storeId ?? "").trim();
   const targetUid = String(request.data?.uid ?? "").trim();

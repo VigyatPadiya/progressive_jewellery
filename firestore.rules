@@ -22,6 +22,11 @@ service cloud.firestore {
         && currentMember(storeId).role in ['admin', 'owner', 'employee'];
     }
 
+    function isStoreAdmin(storeId) {
+      return isMember(storeId)
+        && currentMember(storeId).role == 'admin';
+    }
+
     function canCreateBills(storeId) {
       return isMember(storeId)
         && isStaff(storeId)
@@ -48,7 +53,10 @@ service cloud.firestore {
     }
 
     match /stores/{storeId}/members/{uid} {
-      allow get: if isMember(storeId)
+      // Let an authenticated user check whether their own member profile
+      // exists. New customers need a missing profile to reach the approval
+      // request flow; this still never grants access to another user's profile.
+      allow get: if signedIn()
         && (request.auth.uid == uid || canSeeBusiness(storeId));
       allow list: if isStaff(storeId)
         && (currentMember(storeId).canCreateBills == true
@@ -60,6 +68,15 @@ service cloud.firestore {
       match /tokens/{tokenId} {
         allow read, write: if isMember(storeId) && request.auth.uid == uid;
       }
+    }
+
+    match /stores/{storeId}/applications/{uid} {
+      // Applicants can follow only their own approval state. Only admins can
+      // list requests, and all application changes go through Cloud Functions.
+      allow get: if signedIn()
+        && (request.auth.uid == uid || isStoreAdmin(storeId));
+      allow list: if isStoreAdmin(storeId);
+      allow create, update, delete: if false;
     }
 
     match /stores/{storeId}/customers/{customerId} {

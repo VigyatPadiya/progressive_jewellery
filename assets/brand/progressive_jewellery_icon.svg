@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="background" cx="50%" cy="43%" r="72%">
+      <stop offset="0" stop-color="#38332a" />
+      <stop offset="1" stop-color="#242321" />
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8cc85" />
+      <stop offset="0.52" stop-color="#b08a48" />
+      <stop offset="1" stop-color="#e8cc85" />
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#background)" />
+  <circle cx="512" cy="512" r="348" fill="none" stroke="url(#gold)" stroke-width="11" />
+  <circle cx="512" cy="512" r="316" fill="none" stroke="#b08a48" stroke-opacity="0.56" stroke-width="3" />
+  <path d="M512 239 548 275 512 316 476 275Z" fill="url(#gold)" />
+  <path d="M512 250v50M487 275h50" stroke="#f5e6c3" stroke-linecap="round" stroke-opacity="0.82" stroke-width="3" />
+  <text x="512" y="670" text-anchor="middle" fill="#e8cc85" font-family="Georgia, serif" font-size="350" letter-spacing="-24">PJ</text>
+  <path d="M744 366v38m-19-19h38m-31-13 26 26m0-26-26 26" stroke="#e8cc85" stroke-linecap="round" stroke-width="4" />
+</svg>

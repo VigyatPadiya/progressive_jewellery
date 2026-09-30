@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "786314174253",
+    "project_id": "progressive-jewellery",
+    "storage_bucket": "progressive-jewellery.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:786314174253:android:2b7424841fc7bfcc06fda4",
+        "android_client_info": {
+          "package_name": "com.example.progressive_jewellery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBcOk9VbDi4EHeUC28pVAfwNtW7nVumux0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

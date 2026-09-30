@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -13,34 +12,32 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:progressive_jewellery/services/firebase_app_service.dart';
 import 'package:progressive_jewellery/services/order_notification_service.dart';
+import 'package:progressive_jewellery/firebase_options.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   var firebaseReady = false;
-  if (defaultTargetPlatform == TargetPlatform.windows) {
-    debugPrint('Windows desktop uses the saved local workspace.');
-  } else {
-    try {
-      await Firebase.initializeApp();
-      firebaseReady = true;
-    } catch (error) {
-      debugPrint('Firebase is not configured yet: $error');
-    }
+  String? firebaseError;
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    firebaseReady = true;
+  } catch (error) {
+    firebaseError = error.toString();
+    debugPrint('Firebase could not start: $error');
   }
-  await OrderNotificationService.initialize();
-  final localAccountId = firebaseReady
-      ? null
-      : (await SharedPreferences.getInstance()).getString('local_account_id');
-  final store = AppStore(
-    firebaseEnabled: firebaseReady,
-    seedDemoData: !firebaseReady,
-  );
-  if (!firebaseReady) await store.loadLocalData();
+  try {
+    await OrderNotificationService.initialize();
+  } catch (error) {
+    debugPrint('Order notifications are unavailable: $error');
+  }
+  final store = AppStore(firebaseEnabled: firebaseReady, seedDemoData: false);
   runApp(
     ProgressiveJewelleryApp(
       firebaseReady: firebaseReady,
-      localAccountId: localAccountId,
+      firebaseError: firebaseError,
       store: store,
     ),
   );
@@ -62,15 +59,27 @@ double _storedDouble(Object? value) => value is num ? value.toDouble() : 0;
 
 int _storedInt(Object? value) => value is num ? value.toInt() : 0;
 
+String _accountRequestError(
+  FirebaseFunctionsException error, {
+  required String fallback,
+}) {
+  if (error.code == 'not-found') {
+    return 'The Firebase account-request function was not found. Check that this app is connected to the right Firebase project, then run `firebase deploy --only functions` from the project folder.';
+  }
+  return error.message ?? fallback;
+}
+
 class ProgressiveJewelleryApp extends StatefulWidget {
   const ProgressiveJewelleryApp({
     super.key,
     this.firebaseReady = false,
+    this.firebaseError,
     this.localAccountId,
     this.store,
   });
 
   final bool firebaseReady;
+  final String? firebaseError;
   final String? localAccountId;
   final AppStore? store;
 
@@ -84,7 +93,7 @@ class _ProgressiveJewelleryAppState extends State<ProgressiveJewelleryApp> {
       widget.store ??
       AppStore(
         firebaseEnabled: widget.firebaseReady,
-        seedDemoData: !widget.firebaseReady,
+        seedDemoData: !widget.firebaseReady && widget.firebaseError == null,
       );
   Account? _signedIn;
 
@@ -150,6 +159,8 @@ class _ProgressiveJewelleryAppState extends State<ProgressiveJewelleryApp> {
       ),
       home: widget.firebaseReady
           ? _FirebaseAuthGate(store: _store)
+          : widget.firebaseError != null
+          ? _FirebaseSetupRequired(error: widget.firebaseError!)
           : _signedIn == null
           ? LoginPage(store: _store, onLogin: _localLogin)
           : ShopShell(
@@ -174,6 +185,66 @@ class _ProgressiveJewelleryAppState extends State<ProgressiveJewelleryApp> {
       (preferences) => preferences.remove('local_account_id'),
     );
   }
+}
+
+class _FirebaseSetupRequired extends StatelessWidget {
+  const _FirebaseSetupRequired({required this.error});
+
+  final String error;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.cloud_off_outlined, size: 48, color: _gold),
+                const SizedBox(height: 18),
+                const Text(
+                  'Connect the shared store database',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 25),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'This app needs its Firebase project configuration to sign in and sync orders, customers, products, and bags over the internet. Local demo data is disabled.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: 'Arial', height: 1.5),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Run the Firebase setup steps in FIREBASE_SETUP.md, then restart the app.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Arial',
+                    color: _muted,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  error,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'Arial',
+                    color: _muted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _FirebaseAuthGate extends StatelessWidget {
@@ -234,6 +305,7 @@ class _FirebaseMemberGateState extends State<_FirebaseMemberGate> {
       final data = snapshot.data?.data();
       if (snapshot.hasError || data == null) {
         return _FirebaseProfileMissing(
+          userId: widget.userId,
           onSignOut: () => FirebaseAppService.auth.signOut(),
         );
       }
@@ -273,40 +345,193 @@ class _FirebaseMemberGateState extends State<_FirebaseMemberGate> {
   );
 }
 
-class _FirebaseProfileMissing extends StatelessWidget {
-  const _FirebaseProfileMissing({required this.onSignOut});
+class _FirebaseProfileMissing extends StatefulWidget {
+  const _FirebaseProfileMissing({
+    required this.userId,
+    required this.onSignOut,
+  });
 
+  final String userId;
   final VoidCallback onSignOut;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Your store account is not set up yet.',
-                style: TextStyle(fontSize: 20),
+  State<_FirebaseProfileMissing> createState() =>
+      _FirebaseProfileMissingState();
+}
+
+class _FirebaseProfileMissingState extends State<_FirebaseProfileMissing> {
+  final _name = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: FirebaseAppService.applicationDocument(widget.userId).snapshots(),
+    builder: (context, snapshot) {
+      final application = snapshot.data?.data();
+      final status = application?['status'] as String?;
+      final pending = status == 'pending';
+      final approved = status == 'approved';
+      final rejected = status == 'rejected';
+      final email = FirebaseAppService.auth.currentUser?.email ?? '';
+      final heading = pending
+          ? 'Request sent for approval'
+          : rejected
+          ? 'Access request declined'
+          : approved
+          ? 'Access is being set up'
+          : 'Request access to the store';
+      final message = pending
+          ? 'An administrator must approve your account before you can view or use the store.'
+          : rejected
+          ? 'Your request was declined. You can submit a new request if you still need access.'
+          : approved
+          ? 'Your account was approved. Sign out and sign back in if access does not open shortly.'
+          : 'Create a customer account request. The app will open after an administrator approves it.';
+
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Icon(Icons.lock_outline, size: 42, color: _gold),
+                    const SizedBox(height: 16),
+                    Text(
+                      heading,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontFamily: 'Arial',
+                        color: _muted,
+                        height: 1.5,
+                      ),
+                    ),
+                    if (snapshot.hasError) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Could not check approval status. Check your internet connection and try again.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Arial',
+                          color: Color(0xFFAA4137),
+                        ),
+                      ),
+                    ],
+                    if (!pending && !approved) ...[
+                      const SizedBox(height: 22),
+                      TextField(
+                        controller: _name,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Your name',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        email,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: 'Arial',
+                          color: _muted,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'Arial',
+                            color: Color(0xFFAA4137),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      FilledButton(
+                        onPressed: _submitting ? null : _submitApplication,
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                rejected
+                                    ? 'Request approval again'
+                                    : 'Request approval',
+                              ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: widget.onSignOut,
+                      child: const Text('Sign out'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              const Text(
-                'Ask a store admin to finish connecting this Firebase account.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 18),
-              OutlinedButton(
-                onPressed: onSignOut,
-                child: const Text('Sign out'),
-              ),
-            ],
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
+
+  Future<void> _submitApplication() async {
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Enter your name.');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await FirebaseAppService.submitAccountApplication(name: name);
+    } on FirebaseFunctionsException catch (error) {
+      if (mounted) {
+        setState(
+          () => _error = _accountRequestError(
+            error,
+            fallback: 'Could not submit your request.',
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Could not submit your request. Check your internet connection.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 }
 
 enum UserRole { admin, owner, employee, customer }
@@ -386,6 +611,30 @@ class Account {
   bool get isAdmin => role == UserRole.admin;
   bool get isOwner => role == UserRole.owner;
   bool get canSeeBusiness => isAdmin || isOwner;
+}
+
+class AccountApplication {
+  const AccountApplication({
+    required this.uid,
+    required this.name,
+    required this.email,
+    required this.createdAt,
+  });
+
+  factory AccountApplication.fromFirestore(
+    String uid,
+    Map<String, dynamic> data,
+  ) => AccountApplication(
+    uid: uid,
+    name: data['name'] as String? ?? '',
+    email: data['email'] as String? ?? '',
+    createdAt: _storedDate(data['createdAt']),
+  );
+
+  final String uid;
+  final String name;
+  final String email;
+  final DateTime createdAt;
 }
 
 class Product {
@@ -1066,6 +1315,7 @@ class AppStore {
   final bool firebaseEnabled;
 
   final List<Account> accounts = [];
+  final List<AccountApplication> accountApplications = [];
   final List<Account> manualCustomers = [];
   final List<Product> products = [];
   final Map<String, Map<String, CartLine>> cartsByAccount = {};
@@ -1436,6 +1686,212 @@ class AppStore {
         ..clear()
         ..add(account);
     }
+    if (account.isAdmin) {
+      _subscriptions.add(
+        firestore
+            .collection('$storePath/applications')
+            .where('status', isEqualTo: 'pending')
+            .snapshots()
+            .listen((snapshot) {
+              accountApplications
+                ..clear()
+                ..addAll(
+                  snapshot.docs.map(
+                    (doc) =>
+                        AccountApplication.fromFirestore(doc.id, doc.data()),
+                  ),
+                );
+              accountApplications.sort(
+                (a, b) => a.createdAt.compareTo(b.createdAt),
+              );
+              onChanged();
+            }),
+      );
+    } else {
+      accountApplications.clear();
+    }
+  }
+
+  Future<void> refreshFromServer(Account account) async {
+    if (!firebaseEnabled || account.uid == null) {
+      throw StateError('The shared store database is not connected.');
+    }
+
+    final storePath = 'stores/${FirebaseAppService.storeId}';
+    final firestore = FirebaseAppService.firestore;
+    const server = GetOptions(source: Source.server);
+
+    final productSnapshot = await firestore
+        .collection('$storePath/products')
+        .get(server);
+    final categorySnapshot = await firestore
+        .collection('$storePath/categories')
+        .get(server);
+
+    final existingCarts = cartsByAccount.map(
+      (accountId, cart) =>
+          MapEntry(accountId, Map<String, CartLine>.from(cart)),
+    );
+    products
+      ..clear()
+      ..addAll(
+        productSnapshot.docs.map(
+          (doc) => Product.fromFirestore(doc.id, doc.data()),
+        ),
+      );
+    final refreshedProducts = {
+      for (final product in products) product.id: product,
+    };
+    for (final entry in existingCarts.entries) {
+      final cart = cartsByAccount.putIfAbsent(
+        entry.key,
+        () => <String, CartLine>{},
+      );
+      cart
+        ..clear()
+        ..addAll(
+          entry.value.map((productId, line) {
+            final refreshedProduct = refreshedProducts[productId];
+            return MapEntry(
+              productId,
+              refreshedProduct == null
+                  ? line
+                  : CartLine(refreshedProduct, line.pieces),
+            );
+          }),
+        );
+    }
+    categories
+      ..clear()
+      ..addAll(
+        categorySnapshot.docs.map(
+          (doc) => doc.data()['name'] as String? ?? doc.id,
+        ),
+      );
+
+    final uid = account.uid!;
+    Query<Map<String, dynamic>> orders = firestore.collection(
+      '$storePath/orders',
+    );
+    Query<Map<String, dynamic>> bills = firestore.collection(
+      '$storePath/bills',
+    );
+    Query<Map<String, dynamic>> requests = firestore.collection(
+      '$storePath/pendingRequests',
+    );
+    if (account.role == UserRole.customer) {
+      orders = orders.where('customerUid', isEqualTo: uid);
+      bills = bills.where('customerUid', isEqualTo: uid);
+      requests = requests.where('customerUid', isEqualTo: uid);
+    }
+
+    if (account.role != UserRole.customer &&
+        (account.canCreateBills || account.canSeeBusiness || account.isAdmin)) {
+      final customerSnapshot = await firestore
+          .collection('$storePath/customers')
+          .get(server);
+      manualCustomers
+        ..clear()
+        ..addAll(
+          customerSnapshot.docs.map(
+            (doc) => Account.fromWalkIn(doc.id, doc.data()),
+          ),
+        );
+    } else {
+      manualCustomers.clear();
+    }
+
+    if (account.role == UserRole.customer ||
+        account.isAdmin ||
+        account.isOwner ||
+        account.canShop ||
+        account.canCreateBills) {
+      final orderSnapshot = await orders.get(server);
+      final requestSnapshot = await requests.get(server);
+      this.orders
+        ..clear()
+        ..addAll(
+          orderSnapshot.docs.map(
+            (doc) => CustomerOrder.fromFirestore(doc.id, doc.data()),
+          ),
+        )
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      pendingRequests
+        ..clear()
+        ..addAll(
+          requestSnapshot.docs.map(
+            (doc) => PendingRequest.fromFirestore(doc.id, doc.data()),
+          ),
+        );
+    }
+
+    if (account.role != UserRole.customer) {
+      Query<Map<String, dynamic>> tasks = firestore.collection(
+        '$storePath/productionTasks',
+      );
+      if (account.role == UserRole.employee) {
+        tasks = tasks.where('workerUid', isEqualTo: uid);
+      }
+      final taskSnapshot = await tasks.get(server);
+      productionTasks
+        ..clear()
+        ..addAll(
+          taskSnapshot.docs.map(
+            (doc) => ProductionTask.fromFirestore(doc.id, doc.data()),
+          ),
+        )
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+
+    if (account.role == UserRole.customer ||
+        account.isAdmin ||
+        account.isOwner ||
+        account.canCreateBills ||
+        account.canSeeBusiness) {
+      final billSnapshot = await bills.get(server);
+      this.bills
+        ..clear()
+        ..addAll(
+          billSnapshot.docs.map(
+            (doc) => Bill.fromFirestore(doc.id, doc.data()),
+          ),
+        )
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+
+    final businessSnapshot = await firestore
+        .doc('$storePath/business/profile')
+        .get(server);
+    if (businessSnapshot.exists) {
+      business.loadFirestore(businessSnapshot.data()!);
+    }
+
+    if (account.canSeeBusiness || account.isAdmin || account.canCreateBills) {
+      final memberSnapshot = await firestore
+          .collection('$storePath/members')
+          .get(server);
+      accounts
+        ..clear()
+        ..addAll(
+          memberSnapshot.docs.map(
+            (doc) => Account.fromFirestore(doc.id, doc.data()),
+          ),
+        );
+    }
+
+    if (account.isAdmin) {
+      final applicationSnapshot = await firestore
+          .collection('$storePath/applications')
+          .where('status', isEqualTo: 'pending')
+          .get(server);
+      accountApplications
+        ..clear()
+        ..addAll(
+          applicationSnapshot.docs.map(
+            (doc) => AccountApplication.fromFirestore(doc.id, doc.data()),
+          ),
+        );
+    }
   }
 
   Future<void> stopFirestoreSync() async {
@@ -1694,8 +2150,17 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           if (widget.firebaseAuthEnabled) ...[
                             const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _registerCustomer,
+                                icon: const Icon(Icons.person_add_alt_1),
+                                label: const Text('Create customer account'),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
                             const Text(
-                              'Use the email and password created for your store account.',
+                              'New accounts need admin approval before they can use the store.',
                               style: TextStyle(
                                 fontFamily: 'Arial',
                                 color: _muted,
@@ -1781,6 +2246,177 @@ class _LoginPageState extends State<LoginPage> {
       );
     } else {
       widget.onLogin(account);
+    }
+  }
+
+  Future<void> _registerCustomer() => showDialog<void>(
+    context: context,
+    builder: (_) => const _CustomerRegistrationDialog(),
+  );
+}
+
+class _CustomerRegistrationDialog extends StatefulWidget {
+  const _CustomerRegistrationDialog();
+
+  @override
+  State<_CustomerRegistrationDialog> createState() =>
+      _CustomerRegistrationDialogState();
+}
+
+class _CustomerRegistrationDialogState
+    extends State<_CustomerRegistrationDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmation = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _password.dispose();
+    _confirmation.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Create customer account'),
+    content: SizedBox(
+      width: 400,
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'An administrator must approve your request before you can use the store.',
+                style: TextStyle(fontFamily: 'Arial', height: 1.4),
+              ),
+              const SizedBox(height: 18),
+              TextFormField(
+                controller: _name,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Full name'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter your name'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'Email address'),
+                validator: (value) =>
+                    value == null ||
+                        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                            .hasMatch(value.trim())
+                    ? 'Enter a valid email address'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _password,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Password'),
+                validator: (value) => value == null || value.length < 6
+                    ? 'Use at least 6 characters'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _confirmation,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Confirm password',
+                ),
+                validator: (value) =>
+                    value != _password.text ? 'Passwords do not match' : null,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    fontFamily: 'Arial',
+                    color: Color(0xFFAA4137),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _submitting ? null : () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: _submitting ? null : _createAccount,
+        child: _submitting
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text('Send request'),
+      ),
+    ],
+  );
+
+  Future<void> _createAccount() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final credential = await FirebaseAppService.auth
+          .createUserWithEmailAndPassword(
+            email: _email.text.trim().toLowerCase(),
+            password: _password.text,
+          );
+      await credential.user?.updateDisplayName(_name.text.trim());
+      await FirebaseAppService.submitAccountApplication(name: _name.text);
+      if (mounted) Navigator.of(context).pop();
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = switch (error.code) {
+          'email-already-in-use' =>
+            'An account already uses this email. Sign in to request access.',
+          'invalid-email' => 'Enter a valid email address.',
+          'weak-password' => 'Choose a stronger password.',
+          'network-request-failed' =>
+            'Check your internet connection and try again.',
+          _ => error.message ?? 'Could not create the account.',
+        };
+      });
+    } on FirebaseFunctionsException catch (error) {
+      if (mounted) {
+        setState(
+          () => _error =
+              _accountRequestError(
+                error,
+                fallback: 'The request could not be sent. Sign in to retry.',
+              ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Could not create the account. Check your internet connection.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 }
@@ -1976,7 +2612,15 @@ class _ShopShellState extends State<ShopShell> {
                     onLogout: widget.onLogout,
                   ),
                   Expanded(
-                    child: ColoredBox(color: _paper, child: _buildPage(page)),
+                    child: ColoredBox(
+                      color: _paper,
+                      child: RefreshIndicator(
+                        onRefresh: _refreshFromInternet,
+                        notificationPredicate: (notification) =>
+                            page != _Page.access && notification.depth == 0,
+                        child: _buildPage(page),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -2003,6 +2647,15 @@ class _ShopShellState extends State<ShopShell> {
     _Page.team => _teamPage(),
     _Page.access => const _AccessPage(),
   };
+
+  Future<void> _refreshFromInternet() async {
+    try {
+      await widget.store.refreshFromServer(widget.account);
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (mounted) _snack('Could not refresh from the internet: $error');
+    }
+  }
 
   Widget _customerDashboardPage() {
     final customerOrders = widget.store.orders
@@ -2074,6 +2727,7 @@ class _ShopShellState extends State<ShopShell> {
             : 1;
         final ratio = columns == 1 ? .76 : .7;
         return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
@@ -2481,8 +3135,11 @@ class _ShopShellState extends State<ShopShell> {
 
   Widget _teamPage() => TeamPage(
     accounts: widget.store.accounts,
+    applications: widget.store.accountApplications,
     currentAccount: widget.account,
     onCreate: _createTeamAccount,
+    onApprove: _approveAccountApplication,
+    onReject: _rejectAccountApplication,
     onChanged: (account) {
       setState(() {});
       if (widget.store.firebaseEnabled && account.uid != null) {
@@ -2501,6 +3158,20 @@ class _ShopShellState extends State<ShopShell> {
       }
     },
   );
+
+  Future<void> _approveAccountApplication(
+    AccountApplication application,
+  ) async {
+    await _persist(() async {
+      await FirebaseAppService.approveAccountApplication(application.uid);
+    });
+  }
+
+  Future<void> _rejectAccountApplication(AccountApplication application) async {
+    await _persist(() async {
+      await FirebaseAppService.rejectAccountApplication(application.uid);
+    });
+  }
 
   Future<void> _createTeamAccount(Account account) async {
     if (!widget.store.firebaseEnabled) {
@@ -6399,13 +7070,19 @@ class TeamPage extends StatelessWidget {
   const TeamPage({
     super.key,
     required this.accounts,
+    required this.applications,
     required this.currentAccount,
     required this.onCreate,
+    required this.onApprove,
+    required this.onReject,
     required this.onChanged,
   });
   final List<Account> accounts;
+  final List<AccountApplication> applications;
   final Account currentAccount;
   final ValueChanged<Account> onCreate;
+  final ValueChanged<AccountApplication> onApprove;
+  final ValueChanged<AccountApplication> onReject;
   final ValueChanged<Account> onChanged;
 
   @override
@@ -6461,6 +7138,46 @@ class TeamPage extends StatelessWidget {
               ],
             ),
           ),
+          if (currentAccount.isAdmin) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Pending access requests (${applications.length})',
+                style: const TextStyle(fontSize: 19),
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (applications.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(15),
+                margin: const EdgeInsets.only(bottom: 15),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _line),
+                ),
+                child: const Text(
+                  'No customer requests are waiting for approval.',
+                  style: TextStyle(
+                    fontFamily: 'Arial',
+                    color: _muted,
+                    fontSize: 12,
+                  ),
+                ),
+              )
+            else
+              ...applications.map(
+                (application) => _AccountApplicationCard(
+                  application: application,
+                  onApprove: () => onApprove(application),
+                  onReject: () => onReject(application),
+                ),
+              ),
+            const SizedBox(height: 12),
+            const Divider(color: _line),
+            const SizedBox(height: 12),
+          ],
           ...accounts.map(
             (account) => _AccountCard(
               account: account,
@@ -7369,6 +8086,92 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   }
 }
 
+class _AccountApplicationCard extends StatelessWidget {
+  const _AccountApplicationCard({
+    required this.application,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final AccountApplication application;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(15),
+    margin: const EdgeInsets.only(bottom: 9),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(15),
+      border: Border.all(color: _line),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: const Color(0xFFF1EBDD),
+              foregroundColor: _gold,
+              child: Text(
+                application.name.isEmpty
+                    ? '?'
+                    : application.name[0].toUpperCase(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(application.name, style: const TextStyle(fontSize: 15)),
+                  const SizedBox(height: 3),
+                  Text(
+                    application.email,
+                    style: const TextStyle(
+                      fontFamily: 'Arial',
+                      color: _muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Requested ${_date(application.createdAt)}',
+                    style: const TextStyle(
+                      fontFamily: 'Arial',
+                      color: _muted,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const _Badge(text: 'PENDING'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 9,
+          runSpacing: 7,
+          children: [
+            FilledButton.icon(
+              onPressed: onApprove,
+              icon: const Icon(Icons.check, size: 17),
+              label: const Text('Approve customer'),
+            ),
+            OutlinedButton.icon(
+              onPressed: onReject,
+              icon: const Icon(Icons.close, size: 17),
+              label: const Text('Decline'),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
 class _AccountCard extends StatelessWidget {
   const _AccountCard({required this.account, required this.onEdit});
   final Account account;
@@ -7787,6 +8590,7 @@ class _PageFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
+    physics: const AlwaysScrollableScrollPhysics(),
     padding: const EdgeInsets.fromLTRB(28, 30, 28, 35),
     child: Center(
       child: ConstrainedBox(

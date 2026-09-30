@@ -27,6 +27,31 @@ class FirebaseAppService {
   static DocumentReference<Map<String, dynamic>> memberDocument(String uid) =>
       firestore.doc('stores/$storeId/members/$uid');
 
+  static DocumentReference<Map<String, dynamic>> applicationDocument(
+    String uid,
+  ) => firestore.doc('stores/$storeId/applications/$uid');
+
+  static Future<void> submitAccountApplication({required String name}) async {
+    await functions.httpsCallable('submitStoreAccountApplication').call({
+      'storeId': storeId,
+      'name': name.trim(),
+    });
+  }
+
+  static Future<void> approveAccountApplication(String uid) async {
+    await functions.httpsCallable('approveStoreAccountApplication').call({
+      'storeId': storeId,
+      'uid': uid,
+    });
+  }
+
+  static Future<void> rejectAccountApplication(String uid) async {
+    await functions.httpsCallable('rejectStoreAccountApplication').call({
+      'storeId': storeId,
+      'uid': uid,
+    });
+  }
+
   static Future<Map<String, dynamic>?> loadMember(String uid) async {
     final snapshot = await memberDocument(uid).get();
     return snapshot.data();
