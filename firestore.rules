@@ -161,5 +161,9 @@ service cloud.firestore {
       allow create: if canSeeBusiness(storeId);
       allow update, delete: if false;
     }
+
+    match /stores/{storeId}/chats/{chatRoomId}/messages/{messageId} {
+      allow read, write: if isMember(storeId);
+    }
   }
 }

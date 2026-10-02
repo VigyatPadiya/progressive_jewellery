@@ -9,7 +9,7 @@ initializeApp();
 
 const db = getFirestore();
 const region = "asia-south1";
-const allowedRoles = new Set(["admin", "owner", "employee", "customer"]);
+const allowedRoles = new Set(["admin", "owner", "employee", "worker", "customer"]);
 const orderStatuses = new Set(["received", "preparing", "ready", "completed"]);
 
 function storeMemberRef(storeId, uid) {

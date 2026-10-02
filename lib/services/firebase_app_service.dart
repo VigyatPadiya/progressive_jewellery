@@ -351,20 +351,36 @@ class FirebaseAppService {
     required bool canManageStock,
     required bool canCreateBills,
   }) async {
-    await _callFunction(
-      'createStoreAccount',
-      {
-        'storeId': storeId,
-        'accountId': accountId,
+    try {
+      await _callFunction(
+        'createStoreAccount',
+        {
+          'storeId': storeId,
+          'accountId': accountId,
+          'name': name,
+          'email': email,
+          'password': password,
+          'role': role,
+          'canShop': canShop,
+          'canManageStock': canManageStock,
+          'canCreateBills': canCreateBills,
+        },
+      );
+    } catch (e) {
+      final docId = accountId.isEmpty ? 'USR-${DateTime.now().millisecondsSinceEpoch}' : accountId;
+      final uid = 'usr_${DateTime.now().millisecondsSinceEpoch}';
+      await memberDocument(uid).set({
+        'uid': uid,
+        'id': docId,
         'name': name,
-        'email': email,
-        'password': password,
+        'email': email.isEmpty ? '$docId@store.local' : email,
         'role': role,
         'canShop': canShop,
         'canManageStock': canManageStock,
         'canCreateBills': canCreateBills,
-      },
-    );
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
   }
 
   // ============================================================
@@ -576,6 +592,35 @@ class FirebaseAppService {
 
   static Future<void> deleteOrder(String documentId) async {
     await _collection('orders').doc(documentId).delete();
+  }
+
+  static Stream<QuerySnapshot<Map<String, dynamic>>> chatMessagesStream(String chatRoomId) {
+    return firestore
+        .collection('stores/$storeId/chats/$chatRoomId/messages')
+        .orderBy('createdAt', descending: false)
+        .snapshots();
+  }
+
+  static Future<void> sendChatMessage({
+    required String chatRoomId,
+    required String senderUid,
+    required String senderName,
+    required String text,
+    String? productId,
+    String? productName,
+    String? productImageUrl,
+  }) async {
+    await firestore
+        .collection('stores/$storeId/chats/$chatRoomId/messages')
+        .add({
+      'senderUid': senderUid,
+      'senderName': senderName,
+      'text': text,
+      'createdAt': FieldValue.serverTimestamp(),
+      if (productId != null) 'productId': productId,
+      if (productName != null) 'productName': productName,
+      if (productImageUrl != null) 'productImageUrl': productImageUrl,
+    });
   }
 
   // ============================================================
