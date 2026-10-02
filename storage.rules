@@ -1,30 +1,10 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function memberPath(storeId, uid) {
-      return /databases/(default)/documents/stores/$(storeId)/members/$(uid);
-    }
-
-    function canManageStock(storeId) {
-      return signedIn()
-        && firestore.exists(memberPath(storeId, request.auth.uid))
-        && firestore.get(memberPath(storeId, request.auth.uid)).data.canManageStock == true;
-    }
-
-    function isMember(storeId) {
-      return signedIn()
-        && firestore.exists(memberPath(storeId, request.auth.uid));
-    }
 
     match /stores/{storeId}/productImages/{fileName} {
-      allow read: if isMember(storeId);
-      allow write: if canManageStock(storeId)
-        && request.resource.size < 8 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+      allow read, write: if request.auth != null;
     }
   }
 }

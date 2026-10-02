@@ -64,7 +64,7 @@ String _accountRequestError(
   required String fallback,
 }) {
   if (error.code == 'not-found') {
-    return 'The Firebase account-request function was not found. Check that this app is connected to the right Firebase project, then run `firebase deploy --only functions` from the project folder.';
+    return 'The customer approval function is not deployed. This is separate from admin sign-in. Customer requests need `firebase deploy --only functions` (Blaze billing required). Admin access needs the Firestore rules deployed and an admin member document whose ID matches the signed-in Firebase Auth UID.';
   }
   return error.message ?? fallback;
 }
@@ -75,7 +75,7 @@ class ProgressiveJewelleryApp extends StatefulWidget {
     this.firebaseReady = false,
     this.firebaseError,
     this.localAccountId,
-    this.store,
+    this.store, 
   });
 
   final bool firebaseReady;
@@ -302,10 +302,12 @@ class _FirebaseMemberGateState extends State<_FirebaseMemberGate> {
       if (snapshot.connectionState == ConnectionState.waiting) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
-      final data = snapshot.data?.data();
+
+  final data = snapshot.data?.data();
       if (snapshot.hasError || data == null) {
         return _FirebaseProfileMissing(
           userId: widget.userId,
+          debugError: snapshot.error?.toString() ?? (data == null ? 'Document stores/progressive-jewellery/members/${widget.userId} does not exist.' : null),
           onSignOut: () => FirebaseAppService.auth.signOut(),
         );
       }
@@ -349,10 +351,12 @@ class _FirebaseProfileMissing extends StatefulWidget {
   const _FirebaseProfileMissing({
     required this.userId,
     required this.onSignOut,
+    this.debugError,
   });
 
   final String userId;
   final VoidCallback onSignOut;
+  final String? debugError;
 
   @override
   State<_FirebaseProfileMissing> createState() =>
@@ -464,6 +468,18 @@ class _FirebaseProfileMissingState extends State<_FirebaseProfileMissing> {
                           style: const TextStyle(
                             fontFamily: 'Arial',
                             color: Color(0xFFAA4137),
+                          ),
+                        ),
+                      ],
+                      if (widget.debugError != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          'DEBUG: ${widget.debugError}\nUID: ${widget.userId}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'Arial',
+                            color: Colors.red,
+                            fontSize: 10,
                           ),
                         ),
                       ],
@@ -764,6 +780,9 @@ class CustomerOrder {
       orElse: () => OrderStatus.received,
     );
     order.seenByStaff = data['seenByStaff'] == true;
+    if (data['statusUpdatedAt'] != null) {
+      order.statusUpdatedAt = _storedDate(data['statusUpdatedAt']);
+    }
     return order;
   }
 
@@ -778,6 +797,7 @@ class CustomerOrder {
   final String documentId;
   OrderStatus status = OrderStatus.received;
   bool seenByStaff = false;
+  DateTime? statusUpdatedAt;
 }
 
 enum PendingStatus { pending, ready, fulfilled }
@@ -1945,6 +1965,14 @@ class AppStore {
     );
     product.imageBytes = null;
   }
+
+  Future<void> deleteProduct(Product product) async {
+    if (!firebaseEnabled) {
+      await persistLocalData();
+      return;
+    }
+    await FirebaseAppService.deleteProduct(product.id);
+  }
 }
 
 class LoginPage extends StatefulWidget {
@@ -2522,9 +2550,6 @@ class _ShopShellState extends State<ShopShell> {
     }
     if (_canShop) pages.add(_Page.shop);
     if (_canManageStock) pages.add(_Page.inventory);
-    if (widget.account.role != UserRole.customer) {
-      pages.add(_Page.production);
-    }
     if (_canShop) pages.add(_Page.cart);
     if (_canShop || _canCreateBills) {
       pages.add(_Page.orders);
@@ -2535,12 +2560,11 @@ class _ShopShellState extends State<ShopShell> {
       pages.add(_Page.bills);
     }
     if (widget.account.canSeeBusiness) {
-      pages.addAll([_Page.customers, _Page.statistics, _Page.settings]);
+      pages.addAll([_Page.customers, _Page.statistics]);
     }
     if (widget.account.isAdmin || widget.account.isOwner) {
       pages.add(_Page.team);
     }
-    pages.add(_Page.account);
     if (pages.isEmpty) pages.add(_Page.access);
     return pages;
   }
@@ -2609,6 +2633,7 @@ class _ShopShellState extends State<ShopShell> {
                     onOrders: _pages.contains(_Page.orders)
                         ? () => setState(() => _page = _Page.orders)
                         : null,
+                    onPageSelect: (next) => setState(() => _page = next),
                     onLogout: widget.onLogout,
                   ),
                   Expanded(
@@ -2943,6 +2968,10 @@ class _ShopShellState extends State<ShopShell> {
       );
       unawaited(_persist(() => widget.store.persistProduct(product)));
     },
+    onDeleted: (product) {
+      setState(() {});
+      unawaited(_persist(() => widget.store.deleteProduct(product)));
+    },
   );
 
   Widget _productionPage() => ProductionTasksPage(
@@ -2987,8 +3016,19 @@ class _ShopShellState extends State<ShopShell> {
       canEditPrices: staffCanEdit,
       onEditLinePrice: staffCanEdit ? _editBillLinePrice : null,
       onEditLineQuantity: staffCanEdit ? _editBillLineQuantity : null,
+      onDelete: staffCanEdit ? _deleteBill : null,
       onAddSale: staffCanEdit ? () => setState(() => _page = _Page.shop) : null,
     );
+  }
+
+  Future<void> _deleteBill(Bill bill) async {
+    if (widget.store.firebaseEnabled) {
+      await _persist(() => FirebaseAppService.deleteBill(bill.documentId));
+      setState(() => widget.store.bills.remove(bill));
+    } else {
+      setState(() => widget.store.bills.remove(bill));
+      await widget.store.persistLocalData();
+    }
   }
 
   Widget _pendingPage() {
@@ -3140,6 +3180,7 @@ class _ShopShellState extends State<ShopShell> {
     onCreate: _createTeamAccount,
     onApprove: _approveAccountApplication,
     onReject: _rejectAccountApplication,
+    onDelete: _deleteTeamAccount,
     onChanged: (account) {
       setState(() {});
       if (widget.store.firebaseEnabled && account.uid != null) {
@@ -3158,6 +3199,22 @@ class _ShopShellState extends State<ShopShell> {
       }
     },
   );
+
+  Future<void> _deleteTeamAccount(Account account) async {
+    setState(() {
+      widget.store.accounts.remove(account);
+    });
+    if (widget.store.firebaseEnabled && account.uid != null) {
+      try {
+        await FirebaseAppService.deleteMember(account.uid!);
+      } catch (e) {
+        // If it fails on backend, ensure local state is fine or show error
+        print('Delete member error: $e');
+      }
+    } else {
+      await widget.store.persistLocalData();
+    }
+  }
 
   Future<void> _approveAccountApplication(
     AccountApplication application,
@@ -3302,8 +3359,8 @@ class _ShopShellState extends State<ShopShell> {
     }
     final existing = _cart[product.id];
     final next = (existing?.pieces ?? 0) + pieces;
-    if (pieces > _availablePieces(product)) {
-      _snack('Only ${_availablePieces(product)} pieces are available to add.');
+    if (next > _availablePieces(product) + (existing?.pieces ?? 0)) {
+      _snack('Only ${_availablePieces(product) + (existing?.pieces ?? 0)} pieces are available to add.');
       return;
     }
     setState(() {
@@ -4325,7 +4382,7 @@ class _ProductDetailsPageState extends State<_ProductDetailsPage> {
   }
 }
 
-class _PieceQuantityPicker extends StatelessWidget {
+class _PieceQuantityPicker extends StatefulWidget {
   const _PieceQuantityPicker({
     required this.pieces,
     required this.maximum,
@@ -4334,6 +4391,55 @@ class _PieceQuantityPicker extends StatelessWidget {
   final int pieces;
   final int maximum;
   final ValueChanged<int> onChanged;
+
+  @override
+  State<_PieceQuantityPicker> createState() => _PieceQuantityPickerState();
+}
+
+class _PieceQuantityPickerState extends State<_PieceQuantityPicker> {
+  late final TextEditingController _controller = TextEditingController(text: widget.pieces.toString());
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        _updateQuantity();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _PieceQuantityPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_focusNode.hasFocus && _controller.text != widget.pieces.toString()) {
+      _controller.text = widget.pieces.toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _updateQuantity() {
+    int? newPieces = int.tryParse(_controller.text);
+    if (newPieces == null || newPieces < 1) {
+      newPieces = 1;
+    } else if (newPieces > widget.maximum) {
+      newPieces = widget.maximum;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Only ${widget.maximum} pieces available.')));
+    }
+    
+    if (newPieces != widget.pieces) {
+      widget.onChanged(newPieces);
+    } else {
+      _controller.text = widget.pieces.toString();
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Container(
@@ -4348,19 +4454,34 @@ class _PieceQuantityPicker extends StatelessWidget {
       children: [
         _QtyButton(
           icon: Icons.remove,
-          onPressed: pieces > 1 ? () => onChanged(pieces - 1) : null,
+          onPressed: widget.pieces > 1 ? () => widget.onChanged(widget.pieces - 1) : null,
         ),
-        Text(
-          '$pieces',
-          style: const TextStyle(
-            fontFamily: 'Arial',
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+        SizedBox(
+          width: 40,
+          child: TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: 'Arial',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
+              filled: false,
+            ),
+            onSubmitted: (_) => _updateQuantity(),
           ),
         ),
         _QtyButton(
           icon: Icons.add,
-          onPressed: pieces < maximum ? () => onChanged(pieces + 1) : null,
+          onPressed: widget.pieces < widget.maximum ? () => widget.onChanged(widget.pieces + 1) : null,
         ),
       ],
     ),
@@ -4381,31 +4502,37 @@ class ProductImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (bytes != null) {
-      return Image.memory(
-        bytes!,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _placeholder(),
+      return Container(
+        color: _paper,
+        child: Image.memory(
+          bytes!,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => _placeholder(),
+        ),
       );
     }
     if (url.trim().isEmpty) return _placeholder();
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => _placeholder(),
-      loadingBuilder: (context, child, progress) => progress == null
-          ? child
-          : Stack(
-              fit: StackFit.expand,
-              children: [
-                _placeholder(),
-                const Center(
-                  child: CircularProgressIndicator(
-                    color: _gold,
-                    strokeWidth: 2,
+    return Container(
+      color: _paper,
+      child: Image.network(
+        url,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => _placeholder(),
+        loadingBuilder: (context, child, progress) => progress == null
+            ? child
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  _placeholder(),
+                  const Center(
+                    child: CircularProgressIndicator(
+                      color: _gold,
+                      strokeWidth: 2,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 
@@ -4418,24 +4545,30 @@ class ProductImage extends StatelessWidget {
       ),
     ),
     child: Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.auto_awesome,
-            size: 54,
-            color: _gold.withValues(alpha: .65),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                size: 54,
+                color: _gold.withValues(alpha: .65),
+              ),
+              const SizedBox(height: 11),
+              Text(
+                id,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontFamily: 'Arial',
+                  color: _muted,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 11),
-          Text(
-            id,
-            style: const TextStyle(
-              fontSize: 10,
-              fontFamily: 'Arial',
-              color: _muted,
-            ),
-          ),
-        ],
+        ),
       ),
     ),
   );
@@ -4473,12 +4606,14 @@ class InventoryPage extends StatelessWidget {
     required this.pendingRequests,
     required this.onCategoryAdded,
     required this.onChanged,
+    required this.onDeleted,
   });
   final List<Product> products;
   final Set<String> categories;
   final List<PendingRequest> pendingRequests;
   final ValueChanged<String> onCategoryAdded;
   final ValueChanged<Product> onChanged;
+  final ValueChanged<Product> onDeleted;
 
   @override
   Widget build(BuildContext context) => _PageFrame(
@@ -4516,7 +4651,7 @@ class InventoryPage extends StatelessWidget {
     BuildContext context, {
     Product? product,
   }) async {
-    final result = await showDialog<Product>(
+    final result = await showDialog<dynamic>(
       context: context,
       builder: (_) => _ProductForm(
         product: product,
@@ -4526,19 +4661,28 @@ class InventoryPage extends StatelessWidget {
       ),
     );
     if (result == null) return;
-    if (product == null) {
-      products.add(result);
-    } else {
-      product.name = result.name;
-      product.quality = result.quality;
-      product.price = result.price;
-      product.stock = result.stock;
-      product.imageUrl = result.imageUrl;
-      product.imageBytes = result.imageBytes;
-      product.description = result.description;
-      product.category = result.category;
+    
+    if (result == 'delete' && product != null) {
+      products.remove(product);
+      onDeleted(product);
+      return;
     }
-    onChanged(product ?? result);
+
+    if (result is Product) {
+      if (product == null) {
+        products.add(result);
+      } else {
+        product.name = result.name;
+        product.quality = result.quality;
+        product.price = result.price;
+        product.stock = result.stock;
+        product.imageUrl = result.imageUrl;
+        product.imageBytes = result.imageBytes;
+        product.description = result.description;
+        product.category = result.category;
+      }
+      onChanged(product ?? result);
+    }
   }
 }
 
@@ -4653,7 +4797,7 @@ class _ProductRow extends StatelessWidget {
             },
             itemBuilder: (_) => const [
               PopupMenuItem(value: '+1', child: Text('Add 1 piece')),
-              PopupMenuItem(value: '+5', child: Text('Add 5 pieces')),
+              PopupMenuItem(value: '+50', child: Text('Add 50 pieces')),
               PopupMenuItem(value: '-1', child: Text('Remove 1 piece')),
             ],
             icon: const Icon(Icons.add_box_outlined, color: _muted),
@@ -4884,6 +5028,13 @@ class _ProductFormState extends State<_ProductForm> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (widget.product != null)
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, 'delete'),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    child: const Text('Delete'),
+                  ),
+                const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Cancel'),
@@ -5225,16 +5376,71 @@ class _CartLineCard extends StatelessWidget {
   );
 }
 
-class _QuantityControl extends StatelessWidget {
+class _QuantityControl extends StatefulWidget {
   const _QuantityControl({required this.line, required this.onChanged});
   final CartLine line;
   final VoidCallback onChanged;
+
+  @override
+  State<_QuantityControl> createState() => _QuantityControlState();
+}
+
+class _QuantityControlState extends State<_QuantityControl> {
+  late final TextEditingController _controller = TextEditingController(text: widget.line.pieces.toString());
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        _updateQuantity();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _QuantityControl oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_focusNode.hasFocus && _controller.text != widget.line.pieces.toString()) {
+      _controller.text = widget.line.pieces.toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _updateQuantity() {
+    final shell = context.findAncestorStateOfType<_ShopShellState>();
+    final available = shell?._availablePieces(widget.line.product) ?? widget.line.product.stock;
+    final maxAllowed = available + widget.line.pieces;
+    
+    int? newPieces = int.tryParse(_controller.text);
+    if (newPieces == null || newPieces < 1) {
+      newPieces = 1;
+    } else if (newPieces > maxAllowed) {
+      newPieces = maxAllowed;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Only $maxAllowed pieces available.')));
+    }
+    
+    if (newPieces != widget.line.pieces) {
+      widget.line.pieces = newPieces;
+      widget.onChanged();
+    } else {
+      _controller.text = widget.line.pieces.toString();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final shell = context.findAncestorStateOfType<_ShopShellState>();
     final canAdd = shell == null
-        ? line.pieces < line.product.stock
-        : shell._availablePieces(line.product) > 0;
+        ? widget.line.pieces < widget.line.product.stock
+        : shell._availablePieces(widget.line.product) > 0;
     return Container(
       decoration: BoxDecoration(
         color: _paper,
@@ -5247,32 +5453,47 @@ class _QuantityControl extends StatelessWidget {
           _QtyButton(
             icon: Icons.remove,
             onPressed: () {
-              if (line.pieces <= 1) {
+              if (widget.line.pieces <= 1) {
                 final state = context
                     .findAncestorStateOfType<_ShopShellState>();
                 state?.widget.store
                     .cartFor(state.widget.account)
-                    .remove(line.product.id);
+                    .remove(widget.line.product.id);
               } else {
-                line.pieces--;
+                widget.line.pieces--;
               }
-              onChanged();
+              widget.onChanged();
             },
           ),
-          Text(
-            '${line.pieces}',
-            style: const TextStyle(
-              fontFamily: 'Arial',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          SizedBox(
+            width: 40,
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Arial',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+                filled: false,
+              ),
+              onSubmitted: (_) => _updateQuantity(),
             ),
           ),
           _QtyButton(
             icon: Icons.add,
             onPressed: canAdd
                 ? () {
-                    line.pieces++;
-                    onChanged();
+                    widget.line.pieces++;
+                    widget.onChanged();
                   }
                 : null,
           ),
@@ -5928,6 +6149,7 @@ class BillsPage extends StatelessWidget {
     this.canEditPrices = false,
     this.onEditLinePrice,
     this.onEditLineQuantity,
+    this.onDelete,
     this.onAddSale,
   });
   final List<Bill> bills;
@@ -5935,6 +6157,7 @@ class BillsPage extends StatelessWidget {
   final bool canEditPrices;
   final void Function(Bill bill, int lineIndex)? onEditLinePrice;
   final void Function(Bill bill, int lineIndex)? onEditLineQuantity;
+  final ValueChanged<Bill>? onDelete;
   final VoidCallback? onAddSale;
   @override
   Widget build(BuildContext context) => _PageFrame(
@@ -5964,6 +6187,7 @@ class BillsPage extends StatelessWidget {
                     onEditLineQuantity: canEditPrices
                         ? onEditLineQuantity
                         : null,
+                    onDelete: onDelete != null ? () => onDelete!(bill) : null,
                   ),
                 )
                 .toList(),
@@ -6110,12 +6334,14 @@ class _BillCard extends StatelessWidget {
     this.onRecordPayment,
     this.onEditLinePrice,
     this.onEditLineQuantity,
+    this.onDelete,
   });
   final Bill bill;
   final ValueChanged<Bill> onDownload;
   final VoidCallback? onRecordPayment;
   final void Function(Bill bill, int lineIndex)? onEditLinePrice;
   final void Function(Bill bill, int lineIndex)? onEditLineQuantity;
+  final VoidCallback? onDelete;
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 15),
@@ -6319,6 +6545,15 @@ class _BillCard extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            if (onDelete != null) ...[
+              OutlinedButton.icon(
+                onPressed: onDelete,
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                icon: const Icon(Icons.delete_outline, size: 17),
+                label: const Text('Delete bill'),
+              ),
+              const SizedBox(width: 8),
+            ],
             if (onRecordPayment != null && bill.balance > 0) ...[
               OutlinedButton.icon(
                 onPressed: onRecordPayment,
@@ -7076,6 +7311,7 @@ class TeamPage extends StatelessWidget {
     required this.onApprove,
     required this.onReject,
     required this.onChanged,
+    required this.onDelete,
   });
   final List<Account> accounts;
   final List<AccountApplication> applications;
@@ -7084,6 +7320,7 @@ class TeamPage extends StatelessWidget {
   final ValueChanged<AccountApplication> onApprove;
   final ValueChanged<AccountApplication> onReject;
   final ValueChanged<Account> onChanged;
+  final ValueChanged<Account> onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -7181,7 +7418,7 @@ class TeamPage extends StatelessWidget {
           ...accounts.map(
             (account) => _AccountCard(
               account: account,
-              onEdit: currentAccount.isAdmin
+              onEdit: currentAccount.isAdmin && account.id != currentAccount.id
                   ? () => _editPermissions(context, account)
                   : null,
             ),
@@ -7197,6 +7434,12 @@ class TeamPage extends StatelessWidget {
       builder: (_) => _EditPermissionsDialog(account: account),
     );
     if (permissions == null) return;
+    
+    if (permissions.delete) {
+      onDelete(account);
+      return;
+    }
+    
     account.canShop = permissions.canShop;
     account.canManageStock = account.role == UserRole.customer
         ? false
@@ -8040,6 +8283,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                 labelText: 'Email or phone number',
               ),
               validator: (value) {
+                if (widget.firebaseEnabled) return null;
                 final login = value?.trim().toLowerCase() ?? '';
                 if (login.isEmpty) {
                   return 'Enter an email or phone number';
@@ -8247,11 +8491,13 @@ class _PermissionSelection {
     required this.canShop,
     required this.canManageStock,
     required this.canCreateBills,
+    this.delete = false,
   });
 
   final bool canShop;
   final bool canManageStock;
   final bool canCreateBills;
+  final bool delete;
 }
 
 class _EditPermissionsDialog extends StatefulWidget {
@@ -8273,6 +8519,7 @@ class _EditPermissionsDialogState extends State<_EditPermissionsDialog> {
     title: Text('Permissions for ${widget.account.name}'),
     content: Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _PermissionSwitch(
           title: 'Browse and shop',
@@ -8291,6 +8538,21 @@ class _EditPermissionsDialogState extends State<_EditPermissionsDialog> {
             onChanged: (value) => setState(() => _canCreateBills = value),
           ),
         ],
+        const SizedBox(height: 20),
+        const Divider(color: _line),
+        const SizedBox(height: 10),
+        TextButton(
+          onPressed: () => Navigator.pop(
+            context,
+            _PermissionSelection(
+              canShop: _canShop,
+              canManageStock: _canManageStock,
+              canCreateBills: _canCreateBills,
+              delete: true,
+            ),
+          ),
+          child: const Text('Delete account', style: TextStyle(color: Colors.red)),
+        ),
       ],
     ),
     actions: [
@@ -8305,6 +8567,7 @@ class _EditPermissionsDialogState extends State<_EditPermissionsDialog> {
             canShop: _canShop,
             canManageStock: _canManageStock,
             canCreateBills: _canCreateBills,
+            delete: false,
           ),
         ),
         child: const Text('Save permissions'),
@@ -8684,6 +8947,7 @@ class _TopBar extends StatelessWidget {
     required this.onSearch,
     required this.onCart,
     required this.onOrders,
+    required this.onPageSelect,
     required this.onLogout,
   });
   final Account account;
@@ -8693,6 +8957,7 @@ class _TopBar extends StatelessWidget {
   final ValueChanged<String> onSearch;
   final VoidCallback? onCart;
   final VoidCallback? onOrders;
+  final ValueChanged<_Page> onPageSelect;
   final VoidCallback onLogout;
   @override
   Widget build(BuildContext context) {
@@ -8768,9 +9033,16 @@ class _TopBar extends StatelessWidget {
           const SizedBox(width: 10),
           PopupMenuButton<String>(
             tooltip: 'Account menu',
-            onSelected: (_) => onLogout(),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'logout', child: Text('Sign out')),
+            onSelected: (action) {
+               if (action == 'logout') onLogout();
+               if (action == 'account') onPageSelect(_Page.account);
+               if (action == 'settings' && account.canSeeBusiness) onPageSelect(_Page.settings);
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'account', child: Text('My account')),
+              if (account.canSeeBusiness)
+                 const PopupMenuItem(value: 'settings', child: Text('Business settings')),
+              const PopupMenuItem(value: 'logout', child: Text('Sign out')),
             ],
             child: Row(
               children: [

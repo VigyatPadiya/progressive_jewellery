@@ -63,7 +63,10 @@ service cloud.firestore {
           || canSeeBusiness(storeId));
       // Membership, permissions, and account creation are managed by
       // authenticated Cloud Functions using the Admin SDK.
-      allow create, update, delete: if false;
+      // Temporarily allowing create/update for the Windows fallback.
+      allow create: if signedIn() && isStoreAdmin(storeId);
+      allow update: if signedIn() && isStoreAdmin(storeId);
+      allow delete: if signedIn() && isStoreAdmin(storeId);
 
       match /tokens/{tokenId} {
         allow read, write: if isMember(storeId) && request.auth.uid == uid;
@@ -76,7 +79,11 @@ service cloud.firestore {
       allow get: if signedIn()
         && (request.auth.uid == uid || isStoreAdmin(storeId));
       allow list: if isStoreAdmin(storeId);
-      allow create, update, delete: if false;
+      // Temporarily allowing create for the Windows fallback.
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow update: if isStoreAdmin(storeId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if false;
     }
 
     match /stores/{storeId}/customers/{customerId} {
@@ -119,17 +126,16 @@ service cloud.firestore {
       allow update: if canCreateBills(storeId)
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'seenByStaff', 'statusUpdatedAt']);
-      allow delete: if false;
+      allow delete: if canSeeBusiness(storeId) || canCreateBills(storeId);
     }
 
     match /stores/{storeId}/bills/{billDocumentId} {
       allow get, list: if isMember(storeId)
         && (canCreateBills(storeId) || canSeeBusiness(storeId)
           || resource.data.customerUid == request.auth.uid);
-      allow create, delete: if false;
-      allow update: if (canCreateBills(storeId) || canSeeBusiness(storeId))
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['payments', 'updatedAt']);
+      allow create: if false;
+      allow delete: if canSeeBusiness(storeId);
+      allow update: if (canCreateBills(storeId) || canSeeBusiness(storeId));
     }
 
     match /stores/{storeId}/pendingRequests/{requestId} {

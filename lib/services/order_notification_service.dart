@@ -19,7 +19,7 @@ class OrderNotificationService {
   static String? _currentToken;
 
   static Future<void> initialize() async {
-    if (kIsWeb) return;
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) return;
     await _local.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
