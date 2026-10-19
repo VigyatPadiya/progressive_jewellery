@@ -62,9 +62,9 @@ double _storedDouble(Object? value) => value is num ? value.toDouble() : 0;
 int _storedInt(Object? value) => value is num ? value.toInt() : 0;
 
 String _accountRequestError(
-    FirebaseFunctionsException error, {
-      required String fallback,
-    }) {
+  FirebaseFunctionsException error, {
+  required String fallback,
+}) {
   if (error.code == 'not-found') {
     return 'The customer approval function is not deployed. This is separate from admin sign-in. Customer requests need `firebase deploy --only functions` (Blaze billing required). Admin access needs the Firestore rules deployed and an admin member document whose ID matches the signed-in Firebase Auth UID.';
   }
@@ -93,10 +93,10 @@ class ProgressiveJewelleryApp extends StatefulWidget {
 class _ProgressiveJewelleryAppState extends State<ProgressiveJewelleryApp> {
   late final _store =
       widget.store ??
-          AppStore(
-            firebaseEnabled: widget.firebaseReady,
-            seedDemoData: !widget.firebaseReady && widget.firebaseError == null,
-          );
+      AppStore(
+        firebaseEnabled: widget.firebaseReady,
+        seedDemoData: !widget.firebaseReady && widget.firebaseError == null,
+      );
   Account? _signedIn;
 
   @override
@@ -166,25 +166,25 @@ class _ProgressiveJewelleryAppState extends State<ProgressiveJewelleryApp> {
           : _signedIn == null
           ? LoginPage(store: _store, onLogin: _localLogin)
           : ShopShell(
-        key: ValueKey(_signedIn!.id),
-        store: _store,
-        account: _signedIn!,
-        onLogout: _localLogout,
-      ),
+              key: ValueKey(_signedIn!.id),
+              store: _store,
+              account: _signedIn!,
+              onLogout: _localLogout,
+            ),
     );
   }
 
   void _localLogin(Account account) {
     setState(() => _signedIn = account);
     SharedPreferences.getInstance().then(
-          (preferences) => preferences.setString('local_account_id', account.id),
+      (preferences) => preferences.setString('local_account_id', account.id),
     );
   }
 
   void _localLogout() {
     setState(() => _signedIn = null);
     SharedPreferences.getInstance().then(
-          (preferences) => preferences.remove('local_account_id'),
+      (preferences) => preferences.remove('local_account_id'),
     );
   }
 }
@@ -297,8 +297,8 @@ class _FirebaseMemberGateState extends State<_FirebaseMemberGate> {
 
   @override
   Widget build(
-      BuildContext context,
-      ) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    BuildContext context,
+  ) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
     stream: FirebaseAppService.memberDocument(widget.userId).snapshots(),
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
@@ -309,7 +309,11 @@ class _FirebaseMemberGateState extends State<_FirebaseMemberGate> {
       if (snapshot.hasError || data == null) {
         return _FirebaseProfileMissing(
           userId: widget.userId,
-          debugError: snapshot.error?.toString() ?? (data == null ? 'Document stores/progressive-jewellery/members/${widget.userId} does not exist.' : null),
+          debugError:
+              snapshot.error?.toString() ??
+              (data == null
+                  ? 'Document stores/progressive-jewellery/members/${widget.userId} does not exist.'
+                  : null),
           onSignOut: () => FirebaseAppService.auth.signOut(),
         );
       }
@@ -318,7 +322,7 @@ class _FirebaseMemberGateState extends State<_FirebaseMemberGate> {
           .trim()
           .toLowerCase();
       final role = UserRole.values.firstWhere(
-            (value) => value.name == roleName,
+        (value) => value.name == roleName,
         orElse: () => UserRole.customer,
       );
       final account = Account.fromFirestore(widget.userId, data);
@@ -378,8 +382,8 @@ class _FirebaseProfileMissingState extends State<_FirebaseProfileMissing> {
 
   @override
   Widget build(
-      BuildContext context,
-      ) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    BuildContext context,
+  ) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
     stream: FirebaseAppService.applicationDocument(widget.userId).snapshots(),
     builder: (context, snapshot) {
       final application = snapshot.data?.data();
@@ -490,17 +494,17 @@ class _FirebaseProfileMissingState extends State<_FirebaseProfileMissing> {
                         onPressed: _submitting ? null : _submitApplication,
                         child: _submitting
                             ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
-                        )
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : Text(
-                          rejected
-                              ? 'Request approval again'
-                              : 'Request approval',
-                        ),
+                                rejected
+                                    ? 'Request approval again'
+                                    : 'Request approval',
+                              ),
                       ),
                     ],
                     const SizedBox(height: 12),
@@ -533,7 +537,7 @@ class _FirebaseProfileMissingState extends State<_FirebaseProfileMissing> {
     } on FirebaseFunctionsException catch (error) {
       if (mounted) {
         setState(
-              () => _error = _accountRequestError(
+          () => _error = _accountRequestError(
             error,
             fallback: 'Could not submit your request.',
           ),
@@ -542,8 +546,8 @@ class _FirebaseProfileMissingState extends State<_FirebaseProfileMissing> {
     } catch (_) {
       if (mounted) {
         setState(
-              () => _error =
-          'Could not submit your request. Check your internet connection.',
+          () => _error =
+              'Could not submit your request. Check your internet connection.',
         );
       }
     } finally {
@@ -581,9 +585,9 @@ class Account {
   });
 
   factory Account.fromFirestore(
-      String uid,
-      Map<String, dynamic> data,
-      ) => Account(
+    String uid,
+    Map<String, dynamic> data,
+  ) => Account(
     uid: uid,
     id: data['id'] as String? ?? uid,
     name: data['name'] as String? ?? '',
@@ -592,16 +596,16 @@ class Account {
     phone: data['phone'] as String? ?? '',
     password: '',
     role: UserRole.values.firstWhere(
-          (role) =>
-      role.name == (data['role'] as String? ?? '').trim().toLowerCase(),
+      (role) =>
+          role.name == (data['role'] as String? ?? '').trim().toLowerCase(),
       orElse: () => UserRole.customer,
     ),
     canShop: data['canShop'] == true,
     canManageStock:
-    (data['role'] as String? ?? '').trim().toLowerCase() != 'customer' &&
+        (data['role'] as String? ?? '').trim().toLowerCase() != 'customer' &&
         data['canManageStock'] == true,
     canCreateBills:
-    (data['role'] as String? ?? '').trim().toLowerCase() != 'customer' &&
+        (data['role'] as String? ?? '').trim().toLowerCase() != 'customer' &&
         data['canCreateBills'] == true,
   );
 
@@ -646,9 +650,9 @@ class AccountApplication {
   });
 
   factory AccountApplication.fromFirestore(
-      String uid,
-      Map<String, dynamic> data,
-      ) => AccountApplication(
+    String uid,
+    Map<String, dynamic> data,
+  ) => AccountApplication(
     uid: uid,
     name: data['name'] as String? ?? '',
     email: data['email'] as String? ?? '',
@@ -767,9 +771,9 @@ class CustomerOrder {
   });
 
   factory CustomerOrder.fromFirestore(
-      String documentId,
-      Map<String, dynamic> data,
-      ) {
+    String documentId,
+    Map<String, dynamic> data,
+  ) {
     final order = CustomerOrder(
       id: data['id'] as String? ?? documentId,
       customerId: data['customerId'] as String? ?? '',
@@ -780,14 +784,14 @@ class CustomerOrder {
           .whereType<Map>()
           .map(
             (line) => BillLine.fromFirestore(Map<String, dynamic>.from(line)),
-      )
+          )
           .toList(),
       customerUid: data['customerUid'] as String? ?? '',
       placedByName: data['placedByName'] as String? ?? '',
       documentId: documentId,
     );
     order.status = OrderStatus.values.firstWhere(
-          (status) => status.name == data['status'],
+      (status) => status.name == data['status'],
       orElse: () => OrderStatus.received,
     );
     order.seenByStaff = data['seenByStaff'] == true;
@@ -837,9 +841,9 @@ class PendingRequest {
   });
 
   factory PendingRequest.fromFirestore(
-      String documentId,
-      Map<String, dynamic> data,
-      ) {
+    String documentId,
+    Map<String, dynamic> data,
+  ) {
     final request = PendingRequest(
       id: data['id'] as String? ?? documentId,
       customerId: data['customerId'] as String? ?? '',
@@ -854,7 +858,7 @@ class PendingRequest {
       documentId: documentId,
     );
     request.status = PendingStatus.values.firstWhere(
-          (status) => status.name == data['status'],
+      (status) => status.name == data['status'],
       orElse: () => PendingStatus.pending,
     );
     return request;
@@ -867,7 +871,7 @@ class PendingRequest {
   final String productName;
   final String quality;
   final double pricePerPiece;
-  final int pieces;
+  int pieces;
   final DateTime createdAt;
   final String customerUid;
   final String documentId;
@@ -892,9 +896,9 @@ class ProductionTask {
   });
 
   factory ProductionTask.fromFirestore(
-      String documentId,
-      Map<String, dynamic> data,
-      ) {
+    String documentId,
+    Map<String, dynamic> data,
+  ) {
     final task = ProductionTask(
       id: data['id'] as String? ?? documentId,
       productId: data['productId'] as String? ?? '',
@@ -908,7 +912,7 @@ class ProductionTask {
       documentId: documentId,
     );
     task.status = ProductionTaskStatus.values.firstWhere(
-          (status) => status.name == data['status'],
+      (status) => status.name == data['status'],
       orElse: () => ProductionTaskStatus.assigned,
     );
     return task;
@@ -952,11 +956,17 @@ class BusinessProfile {
   String name = 'Progressive Jewellery';
   String address = '';
   String phone = '';
+  bool enableInventory = true;
+  bool enableProduction = true;
+  bool enableChat = true;
 
   void loadFirestore(Map<String, dynamic> data) {
     name = data['name'] as String? ?? name;
     address = data['address'] as String? ?? address;
     phone = data['phone'] as String? ?? phone;
+    enableInventory = data['enableInventory'] != false;
+    enableProduction = data['enableProduction'] != false;
+    enableChat = data['enableChat'] != false;
   }
 }
 
@@ -975,9 +985,9 @@ class Bill {
   });
 
   factory Bill.fromFirestore(
-      String documentId,
-      Map<String, dynamic> data,
-      ) => Bill(
+    String documentId,
+    Map<String, dynamic> data,
+  ) => Bill(
     id: data['id'] as String? ?? documentId,
     customer: data['customer'] as String? ?? '',
     customerId: data['customerId'] as String? ?? '',
@@ -996,8 +1006,8 @@ class Bill {
         .whereType<Map>()
         .map(
           (payment) =>
-          PaymentEntry.fromFirestore(Map<String, dynamic>.from(payment)),
-    )
+              PaymentEntry.fromFirestore(Map<String, dynamic>.from(payment)),
+        )
         .toList(),
   );
 
@@ -1037,7 +1047,7 @@ Account _accountFromLocal(Map<String, dynamic> data) => Account(
   login: data['login'] as String? ?? '',
   password: data['password'] as String? ?? '',
   role: UserRole.values.firstWhere(
-        (role) => role.name == data['role'],
+    (role) => role.name == data['role'],
     orElse: () => UserRole.customer,
   ),
   canShop: data['canShop'] == true,
@@ -1073,7 +1083,7 @@ Product _productFromLocal(Map<String, dynamic> data) => Product(
   description: data['description'] as String? ?? '',
   category: data['category'] as String? ?? '',
   createdAt:
-  DateTime.tryParse(data['createdAt'] as String? ?? '') ?? DateTime.now(),
+      DateTime.tryParse(data['createdAt'] as String? ?? '') ?? DateTime.now(),
 );
 
 Map<String, dynamic> _lineToLocal(BillLine line) => {
@@ -1131,7 +1141,7 @@ Bill _billFromLocal(Map<String, dynamic> data) => Bill(
   createdByName: data['createdByName'] as String? ?? '',
   documentId: data['documentId'] as String? ?? '',
   createdAt:
-  DateTime.tryParse(data['createdAt'] as String? ?? '') ?? DateTime.now(),
+      DateTime.tryParse(data['createdAt'] as String? ?? '') ?? DateTime.now(),
   lines: (data['lines'] as List<dynamic>? ?? const [])
       .whereType<Map>()
       .map((item) => _lineFromLocal(Map<String, dynamic>.from(item)))
@@ -1161,23 +1171,23 @@ Map<String, dynamic> _orderToLocal(CustomerOrder order) => {
 
 CustomerOrder _orderFromLocal(Map<String, dynamic> data) =>
     CustomerOrder(
-      id: data['id'] as String? ?? '',
-      customerId: data['customerId'] as String? ?? '',
-      customerName: data['customerName'] as String? ?? '',
-      customerUid: data['customerUid'] as String? ?? '',
-      placedByName: data['placedByName'] as String? ?? '',
-      documentId: data['documentId'] as String? ?? '',
-      createdAt:
-      DateTime.tryParse(data['createdAt'] as String? ?? '') ??
-          DateTime.now(),
-      billId: data['billId'] as String? ?? '',
-      lines: (data['lines'] as List<dynamic>? ?? const [])
-          .whereType<Map>()
-          .map((item) => _lineFromLocal(Map<String, dynamic>.from(item)))
-          .toList(),
-    )
+        id: data['id'] as String? ?? '',
+        customerId: data['customerId'] as String? ?? '',
+        customerName: data['customerName'] as String? ?? '',
+        customerUid: data['customerUid'] as String? ?? '',
+        placedByName: data['placedByName'] as String? ?? '',
+        documentId: data['documentId'] as String? ?? '',
+        createdAt:
+            DateTime.tryParse(data['createdAt'] as String? ?? '') ??
+            DateTime.now(),
+        billId: data['billId'] as String? ?? '',
+        lines: (data['lines'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map((item) => _lineFromLocal(Map<String, dynamic>.from(item)))
+            .toList(),
+      )
       ..status = OrderStatus.values.firstWhere(
-            (status) => status.name == data['status'],
+        (status) => status.name == data['status'],
         orElse: () => OrderStatus.received,
       )
       ..seenByStaff = data['seenByStaff'] == true;
@@ -1199,22 +1209,22 @@ Map<String, dynamic> _pendingToLocal(PendingRequest request) => {
 
 PendingRequest _pendingFromLocal(Map<String, dynamic> data) =>
     PendingRequest(
-      id: data['id'] as String? ?? '',
-      customerId: data['customerId'] as String? ?? '',
-      customerName: data['customerName'] as String? ?? '',
-      productId: data['productId'] as String? ?? '',
-      productName: data['productName'] as String? ?? '',
-      quality: data['quality'] as String? ?? '',
-      pricePerPiece: _storedDouble(data['pricePerPiece']),
-      pieces: _storedInt(data['pieces']),
-      createdAt:
-      DateTime.tryParse(data['createdAt'] as String? ?? '') ??
-          DateTime.now(),
-      customerUid: data['customerUid'] as String? ?? '',
-      documentId: data['documentId'] as String? ?? '',
-    )
+        id: data['id'] as String? ?? '',
+        customerId: data['customerId'] as String? ?? '',
+        customerName: data['customerName'] as String? ?? '',
+        productId: data['productId'] as String? ?? '',
+        productName: data['productName'] as String? ?? '',
+        quality: data['quality'] as String? ?? '',
+        pricePerPiece: _storedDouble(data['pricePerPiece']),
+        pieces: _storedInt(data['pieces']),
+        createdAt:
+            DateTime.tryParse(data['createdAt'] as String? ?? '') ??
+            DateTime.now(),
+        customerUid: data['customerUid'] as String? ?? '',
+        documentId: data['documentId'] as String? ?? '',
+      )
       ..status = PendingStatus.values.firstWhere(
-            (status) => status.name == data['status'],
+        (status) => status.name == data['status'],
         orElse: () => PendingStatus.pending,
       );
 
@@ -1243,11 +1253,11 @@ ProductionTask _productionTaskFromLocal(Map<String, dynamic> data) =>
       workerName: data['workerName'] as String? ?? '',
       assignedByName: data['assignedByName'] as String? ?? '',
       createdAt:
-      DateTime.tryParse(data['createdAt'] as String? ?? '') ??
+          DateTime.tryParse(data['createdAt'] as String? ?? '') ??
           DateTime.now(),
       documentId: data['documentId'] as String? ?? '',
       status: ProductionTaskStatus.values.firstWhere(
-            (status) => status.name == data['status'],
+        (status) => status.name == data['status'],
         orElse: () => ProductionTaskStatus.assigned,
       ),
     );
@@ -1303,7 +1313,7 @@ class AppStore {
         stock: 12,
         category: 'Rings',
         description:
-        'A softly sculpted gold band, made to become part of your story.',
+            'A softly sculpted gold band, made to become part of your story.',
         imageUrl: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=1100&q=85',
       ),
       Product(
@@ -1314,7 +1324,7 @@ class AppStore {
         stock: 8,
         category: 'Necklaces',
         description:
-        'A radiant pendant with a fine chain and a warm, polished finish.',
+            'A radiant pendant with a fine chain and a warm, polished finish.',
         imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=1100&q=85',
       ),
       Product(
@@ -1325,7 +1335,7 @@ class AppStore {
         stock: 16,
         category: 'Earrings',
         description:
-        'Light-catching drops with an easy silhouette for every day.',
+            'Light-catching drops with an easy silhouette for every day.',
         imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=1100&q=85',
       ),
       Product(
@@ -1336,7 +1346,7 @@ class AppStore {
         stock: 6,
         category: 'Bracelets',
         description:
-        'A delicate chain bracelet finished with a small, signature charm.',
+            'A delicate chain bracelet finished with a small, signature charm.',
         imageUrl: 'https://images.unsplash.com/photo-1611652022419-a9419f74343d?auto=format&fit=crop&w=1100&q=85',
       ),
     ]);
@@ -1370,7 +1380,7 @@ class AppStore {
         ..clear()
         ..addAll(
           (data['accounts'] as List<dynamic>? ?? const []).whereType<Map>().map(
-                (item) => _accountFromLocal(Map<String, dynamic>.from(item)),
+            (item) => _accountFromLocal(Map<String, dynamic>.from(item)),
           ),
         );
       manualCustomers
@@ -1380,27 +1390,27 @@ class AppStore {
               .whereType<Map>()
               .map(
                 (item) => _accountFromLocal(Map<String, dynamic>.from(item)),
-          ),
+              ),
         );
       products
         ..clear()
         ..addAll(
           (data['products'] as List<dynamic>? ?? const []).whereType<Map>().map(
-                (item) => _productFromLocal(Map<String, dynamic>.from(item)),
+            (item) => _productFromLocal(Map<String, dynamic>.from(item)),
           ),
         );
       bills
         ..clear()
         ..addAll(
           (data['bills'] as List<dynamic>? ?? const []).whereType<Map>().map(
-                (item) => _billFromLocal(Map<String, dynamic>.from(item)),
+            (item) => _billFromLocal(Map<String, dynamic>.from(item)),
           ),
         );
       orders
         ..clear()
         ..addAll(
           (data['orders'] as List<dynamic>? ?? const []).whereType<Map>().map(
-                (item) => _orderFromLocal(Map<String, dynamic>.from(item)),
+            (item) => _orderFromLocal(Map<String, dynamic>.from(item)),
           ),
         );
       pendingRequests
@@ -1410,7 +1420,7 @@ class AppStore {
               .whereType<Map>()
               .map(
                 (item) => _pendingFromLocal(Map<String, dynamic>.from(item)),
-          ),
+              ),
         );
       productionTasks
         ..clear()
@@ -1419,8 +1429,8 @@ class AppStore {
               .whereType<Map>()
               .map(
                 (item) =>
-                _productionTaskFromLocal(Map<String, dynamic>.from(item)),
-          ),
+                    _productionTaskFromLocal(Map<String, dynamic>.from(item)),
+              ),
         );
       categories
         ..clear()
@@ -1452,7 +1462,10 @@ class AppStore {
         business
           ..name = businessData['name'] as String? ?? business.name
           ..address = businessData['address'] as String? ?? ''
-          ..phone = businessData['phone'] as String? ?? '';
+          ..phone = businessData['phone'] as String? ?? ''
+          ..enableInventory = businessData['enableInventory'] != false
+          ..enableProduction = businessData['enableProduction'] != false
+          ..enableChat = businessData['enableChat'] != false;
       }
     } catch (error) {
       debugPrint('Saved local store data could not be read: $error');
@@ -1471,7 +1484,7 @@ class AppStore {
       'productionTasks': productionTasks.map(_productionTaskToLocal).toList(),
       'categories': categories.toList(),
       'carts': cartsByAccount.map(
-            (accountId, cart) => MapEntry(
+        (accountId, cart) => MapEntry(
           accountId,
           cart.map((productId, line) => MapEntry(productId, line.pieces)),
         ),
@@ -1480,16 +1493,19 @@ class AppStore {
         'name': business.name,
         'address': business.address,
         'phone': business.phone,
+        'enableInventory': business.enableInventory,
+        'enableProduction': business.enableProduction,
+        'enableChat': business.enableChat,
       },
     });
     _localWriteQueue = _localWriteQueue
         .catchError((error) {
-      debugPrint('A previous local save failed: $error');
-    })
+          debugPrint('A previous local save failed: $error');
+        })
         .then((_) async {
-      final preferences = await SharedPreferences.getInstance();
-      await preferences.setString('local_store_v1', payload);
-    });
+          final preferences = await SharedPreferences.getInstance();
+          await preferences.setString('local_store_v1', payload);
+        });
     return _localWriteQueue;
   }
 
@@ -1522,9 +1538,9 @@ class AppStore {
   }
 
   Future<void> startFirestoreSync(
-      Account account,
-      VoidCallback onChanged,
-      ) async {
+    Account account,
+    VoidCallback onChanged,
+  ) async {
     final generation = ++_syncGeneration;
     await _cancelFirestoreSubscriptions();
     if (generation != _syncGeneration ||
@@ -1549,13 +1565,13 @@ class AppStore {
 
     _subscriptions.add(
       firestore.collection('$storePath/products').snapshots().listen((
-          snapshot,
-          ) {
+        snapshot,
+      ) {
         products
           ..clear()
           ..addAll(
             snapshot.docs.map(
-                  (doc) => Product.fromFirestore(doc.id, doc.data()),
+              (doc) => Product.fromFirestore(doc.id, doc.data()),
             ),
           );
         restoreCart();
@@ -1564,8 +1580,8 @@ class AppStore {
     );
     _subscriptions.add(
       firestore.collection('$storePath/categories').snapshots().listen((
-          snapshot,
-          ) {
+        snapshot,
+      ) {
         categories
           ..clear()
           ..addAll(
@@ -1579,13 +1595,13 @@ class AppStore {
         (account.canCreateBills || account.canSeeBusiness || account.isAdmin)) {
       _subscriptions.add(
         firestore.collection('$storePath/customers').snapshots().listen((
-            snapshot,
-            ) {
+          snapshot,
+        ) {
           manualCustomers
             ..clear()
             ..addAll(
               snapshot.docs.map(
-                    (doc) => Account.fromWalkIn(doc.id, doc.data()),
+                (doc) => Account.fromWalkIn(doc.id, doc.data()),
               ),
             );
           onChanged();
@@ -1638,7 +1654,7 @@ class AppStore {
             ..clear()
             ..addAll(
               snapshot.docs.map(
-                    (doc) => CustomerOrder.fromFirestore(doc.id, doc.data()),
+                (doc) => CustomerOrder.fromFirestore(doc.id, doc.data()),
               ),
             );
           this.orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -1651,7 +1667,7 @@ class AppStore {
             ..clear()
             ..addAll(
               snapshot.docs.map(
-                    (doc) => PendingRequest.fromFirestore(doc.id, doc.data()),
+                (doc) => PendingRequest.fromFirestore(doc.id, doc.data()),
               ),
             );
           onChanged();
@@ -1674,7 +1690,7 @@ class AppStore {
             ..clear()
             ..addAll(
               snapshot.docs.map(
-                    (doc) => ProductionTask.fromFirestore(doc.id, doc.data()),
+                (doc) => ProductionTask.fromFirestore(doc.id, doc.data()),
               ),
             );
           productionTasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -1693,7 +1709,7 @@ class AppStore {
             ..clear()
             ..addAll(
               snapshot.docs.map(
-                    (doc) => Bill.fromFirestore(doc.id, doc.data()),
+                (doc) => Bill.fromFirestore(doc.id, doc.data()),
               ),
             );
           this.bills.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -1705,8 +1721,8 @@ class AppStore {
     }
     _subscriptions.add(
       firestore.doc('$storePath/business/profile').snapshots().listen((
-          snapshot,
-          ) {
+        snapshot,
+      ) {
         if (snapshot.exists) business.loadFirestore(snapshot.data()!);
         onChanged();
       }),
@@ -1714,13 +1730,13 @@ class AppStore {
     if (account.canSeeBusiness || account.isAdmin || account.canCreateBills) {
       _subscriptions.add(
         firestore.collection('$storePath/members').snapshots().listen((
-            snapshot,
-            ) {
+          snapshot,
+        ) {
           accounts
             ..clear()
             ..addAll(
               snapshot.docs.map(
-                    (doc) => Account.fromFirestore(doc.id, doc.data()),
+                (doc) => Account.fromFirestore(doc.id, doc.data()),
               ),
             );
           onChanged();
@@ -1738,19 +1754,19 @@ class AppStore {
             .where('status', isEqualTo: 'pending')
             .snapshots()
             .listen((snapshot) {
-          accountApplications
-            ..clear()
-            ..addAll(
-              snapshot.docs.map(
+              accountApplications
+                ..clear()
+                ..addAll(
+                  snapshot.docs.map(
                     (doc) =>
-                    AccountApplication.fromFirestore(doc.id, doc.data()),
-              ),
-            );
-          accountApplications.sort(
+                        AccountApplication.fromFirestore(doc.id, doc.data()),
+                  ),
+                );
+              accountApplications.sort(
                 (a, b) => a.createdAt.compareTo(b.createdAt),
-          );
-          onChanged();
-        }),
+              );
+              onChanged();
+            }),
       );
     } else {
       accountApplications.clear();
@@ -1774,14 +1790,14 @@ class AppStore {
         .get(server);
 
     final existingCarts = cartsByAccount.map(
-          (accountId, cart) =>
+      (accountId, cart) =>
           MapEntry(accountId, Map<String, CartLine>.from(cart)),
     );
     products
       ..clear()
       ..addAll(
         productSnapshot.docs.map(
-              (doc) => Product.fromFirestore(doc.id, doc.data()),
+          (doc) => Product.fromFirestore(doc.id, doc.data()),
         ),
       );
     final refreshedProducts = {
@@ -1790,7 +1806,7 @@ class AppStore {
     for (final entry in existingCarts.entries) {
       final cart = cartsByAccount.putIfAbsent(
         entry.key,
-            () => <String, CartLine>{},
+        () => <String, CartLine>{},
       );
       cart
         ..clear()
@@ -1810,7 +1826,7 @@ class AppStore {
       ..clear()
       ..addAll(
         categorySnapshot.docs.map(
-              (doc) => doc.data()['name'] as String? ?? doc.id,
+          (doc) => doc.data()['name'] as String? ?? doc.id,
         ),
       );
 
@@ -1839,7 +1855,7 @@ class AppStore {
         ..clear()
         ..addAll(
           customerSnapshot.docs.map(
-                (doc) => Account.fromWalkIn(doc.id, doc.data()),
+            (doc) => Account.fromWalkIn(doc.id, doc.data()),
           ),
         );
     } else {
@@ -1857,7 +1873,7 @@ class AppStore {
         ..clear()
         ..addAll(
           orderSnapshot.docs.map(
-                (doc) => CustomerOrder.fromFirestore(doc.id, doc.data()),
+            (doc) => CustomerOrder.fromFirestore(doc.id, doc.data()),
           ),
         )
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -1865,7 +1881,7 @@ class AppStore {
         ..clear()
         ..addAll(
           requestSnapshot.docs.map(
-                (doc) => PendingRequest.fromFirestore(doc.id, doc.data()),
+            (doc) => PendingRequest.fromFirestore(doc.id, doc.data()),
           ),
         );
     }
@@ -1882,7 +1898,7 @@ class AppStore {
         ..clear()
         ..addAll(
           taskSnapshot.docs.map(
-                (doc) => ProductionTask.fromFirestore(doc.id, doc.data()),
+            (doc) => ProductionTask.fromFirestore(doc.id, doc.data()),
           ),
         )
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -1898,7 +1914,7 @@ class AppStore {
         ..clear()
         ..addAll(
           billSnapshot.docs.map(
-                (doc) => Bill.fromFirestore(doc.id, doc.data()),
+            (doc) => Bill.fromFirestore(doc.id, doc.data()),
           ),
         )
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -1919,7 +1935,7 @@ class AppStore {
         ..clear()
         ..addAll(
           memberSnapshot.docs.map(
-                (doc) => Account.fromFirestore(doc.id, doc.data()),
+            (doc) => Account.fromFirestore(doc.id, doc.data()),
           ),
         );
     }
@@ -1933,7 +1949,7 @@ class AppStore {
         ..clear()
         ..addAll(
           applicationSnapshot.docs.map(
-                (doc) => AccountApplication.fromFirestore(doc.id, doc.data()),
+            (doc) => AccountApplication.fromFirestore(doc.id, doc.data()),
           ),
         );
     }
@@ -2058,7 +2074,7 @@ class _LoginPageState extends State<LoginPage> {
                         'https://images.unsplash.com/photo-1617038220319-276d3cfab638?auto=format&fit=crop&w=1600&q=85',
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox.shrink(),
+                            const SizedBox.shrink(),
                       ),
                       Container(color: const Color(0x990F0D0A)),
                       Padding(
@@ -2142,7 +2158,7 @@ class _LoginPageState extends State<LoginPage> {
                               prefixIcon: Icon(Icons.person_outline),
                             ),
                             validator: (value) =>
-                            value == null || value.trim().isEmpty
+                                value == null || value.trim().isEmpty
                                 ? 'Enter your email address'
                                 : null,
                           ),
@@ -2156,7 +2172,7 @@ class _LoginPageState extends State<LoginPage> {
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 onPressed: () => setState(
-                                      () => _hidePassword = !_hidePassword,
+                                  () => _hidePassword = !_hidePassword,
                                 ),
                                 icon: Icon(
                                   _hidePassword
@@ -2295,9 +2311,9 @@ class _LoginPageState extends State<LoginPage> {
             'user-not-found' ||
             'wrong-password' => 'Email or password is incorrect.',
             'too-many-requests' =>
-            'Too many attempts. Wait a moment and try again.',
+              'Too many attempts. Wait a moment and try again.',
             'network-request-failed' =>
-            'Check your internet connection and try again.',
+              'Check your internet connection and try again.',
             _ => error.message ?? 'Could not sign in. Try again.',
           };
         });
@@ -2310,7 +2326,7 @@ class _LoginPageState extends State<LoginPage> {
     final account = widget.store.authenticate(_login.text, _password.text);
     if (account == null) {
       setState(
-            () => _error = 'We could not find an account with those details.',
+        () => _error = 'We could not find an account with those details.',
       );
     } else {
       widget.onLogin(account);
@@ -2380,9 +2396,9 @@ class _CustomerRegistrationDialogState
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(labelText: 'Email address'),
                 validator: (value) =>
-                value == null ||
-                    !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                        .hasMatch(value.trim())
+                    value == null ||
+                        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                            .hasMatch(value.trim())
                     ? 'Enter a valid email address'
                     : null,
               ),
@@ -2403,7 +2419,7 @@ class _CustomerRegistrationDialogState
                   labelText: 'Confirm password',
                 ),
                 validator: (value) =>
-                value != _password.text ? 'Passwords do not match' : null,
+                    value != _password.text ? 'Passwords do not match' : null,
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
@@ -2429,10 +2445,10 @@ class _CustomerRegistrationDialogState
         onPressed: _submitting ? null : _createAccount,
         child: _submitting
             ? const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        )
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
             : const Text('Send request'),
       ),
     ],
@@ -2447,9 +2463,9 @@ class _CustomerRegistrationDialogState
     try {
       final credential = await FirebaseAppService.auth
           .createUserWithEmailAndPassword(
-        email: _email.text.trim().toLowerCase(),
-        password: _password.text,
-      );
+            email: _email.text.trim().toLowerCase(),
+            password: _password.text,
+          );
       await credential.user?.updateDisplayName(_name.text.trim());
       await FirebaseAppService.submitAccountApplication(name: _name.text);
       if (mounted) Navigator.of(context).pop();
@@ -2458,29 +2474,28 @@ class _CustomerRegistrationDialogState
       setState(() {
         _error = switch (error.code) {
           'email-already-in-use' =>
-          'An account already uses this email. Sign in to request access.',
+            'An account already uses this email. Sign in to request access.',
           'invalid-email' => 'Enter a valid email address.',
           'weak-password' => 'Choose a stronger password.',
           'network-request-failed' =>
-          'Check your internet connection and try again.',
+            'Check your internet connection and try again.',
           _ => error.message ?? 'Could not create the account.',
         };
       });
     } on FirebaseFunctionsException catch (error) {
       if (mounted) {
         setState(
-              () => _error =
-              _accountRequestError(
-                error,
-                fallback: 'The request could not be sent. Sign in to retry.',
-              ),
+          () => _error = _accountRequestError(
+            error,
+            fallback: 'The request could not be sent. Sign in to retry.',
+          ),
         );
       }
     } catch (_) {
       if (mounted) {
         setState(
-              () => _error =
-          'Could not create the account. Check your internet connection.',
+          () => _error =
+              'Could not create the account. Check your internet connection.',
         );
       }
     } finally {
@@ -2538,16 +2553,16 @@ class _ShopShellState extends State<ShopShell> {
 
   bool get _canShop =>
       widget.account.canShop ||
-          widget.account.isAdmin ||
-          widget.account.isOwner;
+      widget.account.isAdmin ||
+      widget.account.isOwner;
   bool get _canManageStock =>
       widget.account.canManageStock ||
-          widget.account.isAdmin ||
-          widget.account.isOwner;
+      widget.account.isAdmin ||
+      widget.account.isOwner;
   bool get _canCreateBills =>
       widget.account.canCreateBills ||
-          widget.account.isAdmin ||
-          widget.account.isOwner;
+      widget.account.isAdmin ||
+      widget.account.isOwner;
 
   @override
   void initState() {
@@ -2579,8 +2594,11 @@ class _ShopShellState extends State<ShopShell> {
   int _reservedPieces(Product product) => widget.store.cartsByAccount.values
       .fold(0, (sum, cart) => sum + (cart[product.id]?.pieces ?? 0));
 
-  int _availablePieces(Product product) =>
-      (product.stock - _reservedPieces(product)).clamp(0, 1 << 30).toInt();
+  bool get _stockManagementEnabled => widget.store.business.enableInventory;
+
+  int _availablePieces(Product product) => !_stockManagementEnabled
+      ? 1 << 30
+      : (product.stock - _reservedPieces(product)).clamp(0, 1 << 30).toInt();
 
   int get _unseenOrders => widget.account.role == UserRole.customer
       ? 0
@@ -2597,8 +2615,10 @@ class _ShopShellState extends State<ShopShell> {
         pages.add(_Page.adminPanel);
       }
       if (_canShop) pages.add(_Page.shop);
+      // Inventory stays available so staff can add and maintain products.
+      // The stock setting controls stock behavior, not access to the catalog.
       if (_canManageStock) pages.add(_Page.inventory);
-      pages.add(_Page.production);
+      if (widget.store.business.enableProduction) pages.add(_Page.production);
       if (_canShop) pages.add(_Page.cart);
       if (_canShop || _canCreateBills) {
         pages.add(_Page.orders);
@@ -2613,7 +2633,7 @@ class _ShopShellState extends State<ShopShell> {
         pages.add(_Page.team);
       }
     }
-    pages.add(_Page.chat);
+    if (widget.store.business.enableChat) pages.add(_Page.chat);
     if (widget.account.canSeeBusiness) {
       pages.add(_Page.settings);
     }
@@ -2633,24 +2653,24 @@ class _ShopShellState extends State<ShopShell> {
       drawer: desktop
           ? null
           : Drawer(
-        width: 280,
-        child: SafeArea(
-          child: _Sidebar(
-            width: 280,
-            compact: true,
-            account: widget.account,
-            page: page,
-            pages: _pages,
-            cartCount: _pieceCount,
-            orderCount: _unseenOrders,
-            onSelect: (next) {
-              setState(() => _page = next);
-              _scaffoldKey.currentState?.closeDrawer();
-            },
-            onLogout: widget.onLogout,
-          ),
-        ),
-      ),
+              width: 280,
+              child: SafeArea(
+                child: _Sidebar(
+                  width: 280,
+                  compact: true,
+                  account: widget.account,
+                  page: page,
+                  pages: _pages,
+                  cartCount: _pieceCount,
+                  orderCount: _unseenOrders,
+                  onSelect: (next) {
+                    setState(() => _page = next);
+                    _scaffoldKey.currentState?.closeDrawer();
+                  },
+                  onLogout: widget.onLogout,
+                ),
+              ),
+            ),
       body: SafeArea(
         child: Row(
           children: [
@@ -2670,7 +2690,6 @@ class _ShopShellState extends State<ShopShell> {
               child: Column(
                 children: [
                   _TopBar(
-                    account: widget.account,
                     onMenu: desktop
                         ? null
                         : () => _scaffoldKey.currentState?.openDrawer(),
@@ -2686,8 +2705,6 @@ class _ShopShellState extends State<ShopShell> {
                     onOrders: _pages.contains(_Page.orders)
                         ? () => setState(() => _page = _Page.orders)
                         : null,
-                    onPageSelect: (next) => setState(() => _page = next),
-                    onLogout: widget.onLogout,
                   ),
                   Expanded(
                     child: ColoredBox(
@@ -2695,7 +2712,7 @@ class _ShopShellState extends State<ShopShell> {
                       child: RefreshIndicator(
                         onRefresh: _refreshFromInternet,
                         notificationPredicate: (notification) =>
-                        page != _Page.access && notification.depth == 0,
+                            page != _Page.access && notification.depth == 0,
                         child: _buildPage(page),
                       ),
                     ),
@@ -2750,7 +2767,11 @@ class _ShopShellState extends State<ShopShell> {
 
   Widget _workerPanelPage() {
     final workerTasks = widget.store.productionTasks
-        .where((t) => t.workerUid == widget.account.uid || t.workerName == widget.account.name)
+        .where(
+          (t) =>
+              t.workerUid == widget.account.uid ||
+              t.workerName == widget.account.name,
+        )
         .toList();
     return ProductionTasksPage(
       account: widget.account,
@@ -2765,9 +2786,14 @@ class _ShopShellState extends State<ShopShell> {
 
   Widget _adminPanelPage() {
     final totalSales = widget.store.bills.fold(0.0, (sum, b) => sum + b.total);
-    final totalBalance = widget.store.bills.fold(0.0, (sum, b) => sum + b.balance);
+    final totalBalance = widget.store.bills.fold(
+      0.0,
+      (sum, b) => sum + b.balance,
+    );
     final pendingApps = widget.store.accountApplications;
-    final lowStockItems = widget.store.products.where((p) => p.stock <= 10).toList();
+    final lowStockItems = widget.store.products
+        .where((p) => p.stock <= 10)
+        .toList();
 
     return _PageFrame(
       eyebrow: 'ADMINISTRATION',
@@ -2780,10 +2806,7 @@ class _ShopShellState extends State<ShopShell> {
             spacing: 12,
             runSpacing: 12,
             children: [
-              _MiniMetric(
-                label: 'TOTAL SALES',
-                value: _money(totalSales),
-              ),
+              _MiniMetric(label: 'TOTAL SALES', value: _money(totalSales)),
               _MiniMetric(
                 label: 'OUTSTANDING BALANCE',
                 value: _money(totalBalance),
@@ -2817,7 +2840,14 @@ class _ShopShellState extends State<ShopShell> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Pending Customer Approvals (${pendingApps.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Arial')),
+                      Text(
+                        'Pending Customer Approvals (${pendingApps.length})',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Arial',
+                        ),
+                      ),
                       TextButton(
                         onPressed: () => setState(() => _page = _Page.team),
                         child: const Text('View All'),
@@ -2825,11 +2855,15 @@ class _ShopShellState extends State<ShopShell> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  ...pendingApps.take(3).map((app) => _AccountApplicationCard(
-                    application: app,
-                    onApprove: () => _approveAccountApplication(app),
-                    onReject: () => _rejectAccountApplication(app),
-                  )),
+                  ...pendingApps
+                      .take(3)
+                      .map(
+                        (app) => _AccountApplicationCard(
+                          application: app,
+                          onApprove: () => _approveAccountApplication(app),
+                          onReject: () => _rejectAccountApplication(app),
+                        ),
+                      ),
                 ],
               ),
             ),
@@ -2850,33 +2884,63 @@ class _ShopShellState extends State<ShopShell> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Low Stock / Out of Stock Items', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Arial', color: Color(0xFFAA4137))),
+                      const Text(
+                        'Low Stock / Out of Stock Items',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Arial',
+                          color: Color(0xFFAA4137),
+                        ),
+                      ),
                       TextButton(
-                        onPressed: () => setState(() => _page = _Page.inventory),
+                        onPressed: () =>
+                            setState(() => _page = _Page.inventory),
                         child: const Text('Manage Stock'),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  ...lowStockItems.take(4).map((product) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text('${product.name} (${product.id})', style: const TextStyle(fontFamily: 'Arial', fontSize: 13, fontWeight: FontWeight.w600)),
+                  ...lowStockItems
+                      .take(4)
+                      .map(
+                        (product) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${product.name} (${product.id})',
+                                  style: const TextStyle(
+                                    fontFamily: 'Arial',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              _Badge(
+                                text: '${product.stock} PIECES LEFT',
+                                muted: product.stock == 0,
+                              ),
+                            ],
+                          ),
                         ),
-                        _Badge(text: '${product.stock} PIECES LEFT', muted: product.stock == 0),
-                      ],
-                    ),
-                  )),
+                      ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
           ],
 
-          const Text('Quick Administrative Actions', style: TextStyle(fontFamily: 'Arial', fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text(
+            'Quick Administrative Actions',
+            style: TextStyle(
+              fontFamily: 'Arial',
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 12,
@@ -2947,6 +3011,9 @@ class _ShopShellState extends State<ShopShell> {
           product: product,
           allowCart: _canShop,
           availablePieces: _availablePieces(product),
+          showStock:
+              _stockManagementEnabled &&
+              widget.account.role != UserRole.customer,
           onAdd: (pieces) => _addToCart(product, pieces),
           onRequestPending: () => _requestPending(product),
         ),
@@ -2957,14 +3024,15 @@ class _ShopShellState extends State<ShopShell> {
   Widget _shopPage() {
     final items = widget.store.products.where((product) {
       final text =
-      '${product.name} ${product.id} ${product.quality} ${product.category}'
-          .toLowerCase();
+          '${product.name} ${product.id} ${product.quality} ${product.category}'
+              .toLowerCase();
       final matchesStock = switch (_stockFilter) {
         _StockFilter.all => true,
         _StockFilter.inStock => _availablePieces(product) > 0,
         _StockFilter.outOfStock => _availablePieces(product) == 0,
       };
-      final matchesCustomer = product.exclusiveCustomerId == null ||
+      final matchesCustomer =
+          product.exclusiveCustomerId == null ||
           product.exclusiveCustomerId!.isEmpty ||
           product.exclusiveCustomerId == widget.account.id ||
           widget.account.role != UserRole.customer;
@@ -2974,7 +3042,7 @@ class _ShopShellState extends State<ShopShell> {
           matchesCustomer;
     }).toList();
     items.sort(
-          (a, b) => switch (_productSort) {
+      (a, b) => switch (_productSort) {
         _ProductSort.recent => b.createdAt.compareTo(a.createdAt),
         _ProductSort.priceLowToHigh => a.price.compareTo(b.price),
         _ProductSort.priceHighToLow => b.price.compareTo(a.price),
@@ -3036,26 +3104,26 @@ class _ShopShellState extends State<ShopShell> {
                     children: categories
                         .map(
                           (category) => Padding(
-                        padding: const EdgeInsets.only(right: 9),
-                        child: ChoiceChip(
-                          label: Text(category),
-                          selected: _category == category,
-                          onSelected: (_) =>
-                              setState(() => _category = category),
-                          showCheckmark: false,
-                          labelStyle: TextStyle(
-                            color: _category == category
-                                ? Colors.white
-                                : _ink,
-                            fontFamily: 'Arial',
-                            fontSize: 12,
+                            padding: const EdgeInsets.only(right: 9),
+                            child: ChoiceChip(
+                              label: Text(category),
+                              selected: _category == category,
+                              onSelected: (_) =>
+                                  setState(() => _category = category),
+                              showCheckmark: false,
+                              labelStyle: TextStyle(
+                                color: _category == category
+                                    ? Colors.white
+                                    : _ink,
+                                fontFamily: 'Arial',
+                                fontSize: 12,
+                              ),
+                              selectedColor: _ink,
+                              side: const BorderSide(color: _line),
+                              backgroundColor: Colors.white,
+                            ),
                           ),
-                          selectedColor: _ink,
-                          side: const BorderSide(color: _line),
-                          backgroundColor: Colors.white,
-                        ),
-                      ),
-                    )
+                        )
                         .toList(),
                   ),
                 ),
@@ -3107,11 +3175,14 @@ class _ShopShellState extends State<ShopShell> {
                 padding: const EdgeInsets.fromLTRB(28, 9, 28, 34),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
-                        (context, index) => ProductCard(
+                    (context, index) => ProductCard(
                       key: ValueKey(items[index].id),
                       product: items[index],
                       allowCart: _canShop,
                       availablePieces: _availablePieces(items[index]),
+                      showStock:
+                          _stockManagementEnabled &&
+                          widget.account.role != UserRole.customer,
                       onAdd: (pieces) => _addToCart(items[index], pieces),
                       onRequestPending: () => _requestPending(items[index]),
                       onOpenDetails: () => _openProductDetails(items[index]),
@@ -3158,30 +3229,30 @@ class _ShopShellState extends State<ShopShell> {
         selectedItemBuilder: (context) => items.entries
             .map(
               (entry) => Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '$label: ${entry.value}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: 'Arial',
-                fontSize: 11,
-                color: _ink,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '$label: ${entry.value}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Arial',
+                    fontSize: 11,
+                    color: _ink,
+                  ),
+                ),
               ),
-            ),
-          ),
-        )
+            )
             .toList(),
         items: items.entries
             .map(
               (entry) => DropdownMenuItem<T>(
-            value: entry.key,
-            child: Text(
-              entry.value,
-              style: const TextStyle(fontFamily: 'Arial', fontSize: 11),
-            ),
-          ),
-        )
+                value: entry.key,
+                child: Text(
+                  entry.value,
+                  style: const TextStyle(fontFamily: 'Arial', fontSize: 11),
+                ),
+              ),
+            )
             .toList(),
       ),
     ),
@@ -3221,9 +3292,9 @@ class _ShopShellState extends State<ShopShell> {
     tasks: widget.store.productionTasks
         .where(
           (task) =>
-      widget.account.role != UserRole.employee ||
-          task.workerUid == (widget.account.uid ?? widget.account.id),
-    )
+              widget.account.role != UserRole.employee ||
+              task.workerUid == (widget.account.uid ?? widget.account.id),
+        )
         .toList(),
     products: widget.store.products,
     workers: widget.store.accounts
@@ -3244,11 +3315,72 @@ class _ShopShellState extends State<ShopShell> {
     allowOrdering: widget.account.role == UserRole.customer || _canCreateBills,
   );
 
+  Future<void> _recordBillPayment(Bill bill) async {
+    final amount = await showDialog<double>(
+      context: context,
+      builder: (_) => _RecordPaymentDialog(bill: bill),
+    );
+    if (amount == null || amount <= 0) return;
+
+    final payment = PaymentEntry(
+      id: 'PAY-${DateTime.now().millisecondsSinceEpoch}',
+      amount: amount,
+      date: DateTime.now(),
+      note: 'Customer payment',
+    );
+
+    setState(() {
+      bill.payments.add(payment);
+    });
+
+    if (widget.store.firebaseEnabled && bill.documentId.isNotEmpty) {
+      unawaited(
+        _persist(
+          () => FirebaseAppService.addBillPayment(
+            bill.documentId,
+            <String, Object?>{
+              'id': payment.id,
+              'amount': payment.amount,
+              'date': payment.date.toIso8601String(),
+              'note': payment.note,
+            },
+          ),
+        ),
+      );
+    } else {
+      unawaited(widget.store.persistLocalData());
+    }
+  }
+
+  Future<void> _saveBillLines(Bill bill) async {
+    if (widget.store.firebaseEnabled) {
+      await _persist(() => FirebaseAppService.saveBill(bill));
+    } else {
+      await widget.store.persistLocalData();
+    }
+    setState(() {});
+  }
+
+  Future<void> _deleteBill(Bill bill) async {
+    final docId = bill.documentId.isNotEmpty ? bill.documentId : bill.id;
+    if (widget.store.firebaseEnabled && docId.isNotEmpty) {
+      await _persist(() => FirebaseAppService.deleteBill(docId));
+      setState(
+        () => widget.store.bills.removeWhere(
+          (b) => b.id == bill.id || b.documentId == bill.documentId,
+        ),
+      );
+    } else {
+      setState(() => widget.store.bills.removeWhere((b) => b.id == bill.id));
+      await widget.store.persistLocalData();
+    }
+  }
+
   Widget _billsPage() {
     final bills = widget.account.role == UserRole.customer
         ? widget.store.bills
-        .where((bill) => bill.customerId == widget.account.id)
-        .toList()
+              .where((bill) => bill.customerId == widget.account.id)
+              .toList()
         : widget.store.bills;
     final staffCanEdit =
         widget.account.role != UserRole.customer && _canCreateBills;
@@ -3261,52 +3393,28 @@ class _ShopShellState extends State<ShopShell> {
       onEditLineQuantity: staffCanEdit ? _editBillLineQuantity : null,
       onDelete: staffCanEdit ? _deleteBill : null,
       onAddSale: staffCanEdit ? () => setState(() => _page = _Page.shop) : null,
+      onRecordPayment: staffCanEdit ? _recordBillPayment : null,
     );
-  }
-
-  Future<void> _saveBillLines(Bill bill) async {
-    if (widget.store.firebaseEnabled) {
-      await _persist(() async {
-        final docRef = FirebaseAppService.firestore.doc('stores/${FirebaseAppService.storeId}/bills/${bill.documentId}');
-        await docRef.update({
-          'lines': bill.lines.map((l) => {
-            'productId': l.productId,
-            'name': l.name,
-            'quality': l.quality,
-            'pieces': l.pieces,
-            'price': l.price,
-            'orderedPieces': l.orderedPieces,
-          }).toList(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      });
-    } else {
-      await widget.store.persistLocalData();
-    }
-    setState(() {});
-  }
-
-  Future<void> _deleteBill(Bill bill) async {
-    if (widget.store.firebaseEnabled) {
-      await _persist(() => FirebaseAppService.deleteBill(bill.documentId));
-      setState(() => widget.store.bills.remove(bill));
-    } else {
-      setState(() => widget.store.bills.remove(bill));
-      await widget.store.persistLocalData();
-    }
   }
 
   Widget _pendingPage() {
     final requests =
-    widget.store.pendingRequests
-        .where((request) => request.customerId == widget.account.id)
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        widget.store.pendingRequests
+            .where(
+              (request) =>
+                  request.customerId == widget.account.id &&
+                  request.status != PendingStatus.fulfilled,
+            )
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return PendingItemsPage(
       requests: requests,
       products: widget.store.products,
       onAdd: _addPendingToCart,
       onRefresh: (product) => setState(() => _refreshPendingStatuses(product)),
+      onEdit: _editPendingRequest,
+      onDelete: _deletePendingRequest,
+      onOpenProduct: _openProductDetails,
     );
   }
 
@@ -3320,7 +3428,7 @@ class _ShopShellState extends State<ShopShell> {
       if (widget.store.firebaseEnabled && order.documentId.isNotEmpty) {
         unawaited(
           _persist(
-                () => FirebaseAppService.updateOrderStatus(
+            () => FirebaseAppService.updateOrderStatus(
               orderDocumentId: order.documentId,
               status: status.name,
             ),
@@ -3356,13 +3464,15 @@ class _ShopShellState extends State<ShopShell> {
     onAddPending: _addPendingToCart,
     onRefreshPending: (product) =>
         setState(() => _refreshPendingStatuses(product)),
+    onDeletePending: _deletePendingRequest,
+    onOpenProduct: _openProductDetails,
     onDownload: _downloadReceipt,
   );
 
   Widget _customersPage() => CustomersPage(
     customers: [
       ...widget.store.accounts.where(
-            (account) => account.role == UserRole.customer,
+        (account) => account.role == UserRole.customer,
       ),
       ...widget.store.manualCustomers,
     ],
@@ -3384,7 +3494,7 @@ class _ShopShellState extends State<ShopShell> {
       if (widget.store.firebaseEnabled && bill.documentId.isNotEmpty) {
         unawaited(
           _persist(
-                () => FirebaseAppService.addBillPayment(
+            () => FirebaseAppService.addBillPayment(
               bill.documentId,
               <String, Object?>{
                 'id': bill.payments.last.id,
@@ -3410,14 +3520,18 @@ class _ShopShellState extends State<ShopShell> {
 
   Widget _settingsPage() => BusinessSettingsPage(
     business: widget.store.business,
+    onOpenAccount: () => setState(() => _page = _Page.account),
     onChanged: () {
       setState(() {});
       unawaited(
         _persist(
-              () => FirebaseAppService.saveBusiness(
+          () => FirebaseAppService.saveBusiness(
             name: widget.store.business.name,
             address: widget.store.business.address,
             phone: widget.store.business.phone,
+            enableInventory: widget.store.business.enableInventory,
+            enableProduction: widget.store.business.enableProduction,
+            enableChat: widget.store.business.enableChat,
           ),
         ),
       );
@@ -3462,7 +3576,7 @@ class _ShopShellState extends State<ShopShell> {
       if (widget.store.firebaseEnabled && account.uid != null) {
         unawaited(
           _persist(
-                () => FirebaseAppService.updateMemberProfile(
+            () => FirebaseAppService.updateMemberProfile(
               uid: account.uid!,
               canShop: account.canShop,
               canManageStock: account.canManageStock,
@@ -3493,8 +3607,8 @@ class _ShopShellState extends State<ShopShell> {
   }
 
   Future<void> _approveAccountApplication(
-      AccountApplication application,
-      ) async {
+    AccountApplication application,
+  ) async {
     await _persist(() async {
       await FirebaseAppService.approveAccountApplication(application.uid);
     });
@@ -3561,10 +3675,10 @@ class _ShopShellState extends State<ShopShell> {
   }
 
   Future<void> _assignProductionTask(
-      Product product,
-      Account worker,
-      int piecesToMake,
-      ) async {
+    Product product,
+    Account worker,
+    int piecesToMake,
+  ) async {
     final id = 'TASK-${DateTime.now().microsecondsSinceEpoch}';
     final workerUid = worker.uid ?? worker.id;
     final task = ProductionTask(
@@ -3606,9 +3720,9 @@ class _ShopShellState extends State<ShopShell> {
   }
 
   Future<void> _updateProductionTaskStatus(
-      ProductionTask task,
-      ProductionTaskStatus status,
-      ) async {
+    ProductionTask task,
+    ProductionTaskStatus status,
+  ) async {
     try {
       if (widget.store.firebaseEnabled) {
         if (task.documentId.isEmpty) {
@@ -3629,14 +3743,16 @@ class _ShopShellState extends State<ShopShell> {
   }
 
   void _addToCart(Product product, int pieces) {
-    if (product.stock < 1) {
+    if (_stockManagementEnabled && product.stock < 1) {
       _snack('This piece is currently out of stock.');
       return;
     }
     final existing = _cart[product.id];
     final next = (existing?.pieces ?? 0) + pieces;
     if (next > _availablePieces(product) + (existing?.pieces ?? 0)) {
-      _snack('Only ${_availablePieces(product) + (existing?.pieces ?? 0)} pieces are available to add.');
+      _snack(
+        'Only ${_availablePieces(product) + (existing?.pieces ?? 0)} pieces are available to add.',
+      );
       return;
     }
     setState(() {
@@ -3652,29 +3768,37 @@ class _ShopShellState extends State<ShopShell> {
 
   Future<void> _checkout() async {
     if (_cart.isEmpty) return;
-    final lines = _cart.values
-        .map(
-          (line) => BillLine(
-        productId: line.product.id,
-        name: line.product.name,
-        quality: line.product.quality,
-        price: line.product.price,
-        pieces: line.pieces,
-      ),
-    )
-        .toList();
-    for (final line in _cart.values) {
-      final otherReservations = _reservedPieces(line.product) - line.pieces;
-      if (line.pieces > line.product.stock - otherReservations) {
-        _snack(
-          'Stock changed for ${line.product.name}. Review the bag before billing.',
-        );
-        return;
+    final cartLines = _cart.values.toList();
+    var lines = <BillLine>[];
+    var pendingPieces = <String, int>{};
+    for (final cartLine in cartLines) {
+      var billPieces = cartLine.pieces;
+      if (_stockManagementEnabled) {
+        final otherReservations =
+            _reservedPieces(cartLine.product) - cartLine.pieces;
+        final available = (cartLine.product.stock - otherReservations)
+            .clamp(0, 1 << 30)
+            .toInt();
+        billPieces = cartLine.pieces > available ? available : cartLine.pieces;
       }
+      if (billPieces > 0) {
+        lines.add(
+          BillLine(
+            productId: cartLine.product.id,
+            name: cartLine.product.name,
+            quality: cartLine.product.quality,
+            price: cartLine.product.price,
+            pieces: billPieces,
+            orderedPieces: cartLine.pieces,
+          ),
+        );
+      }
+      final shortage = cartLine.pieces - billPieces;
+      if (shortage > 0) pendingPieces[cartLine.product.id] = shortage;
     }
     final customers = [
       ...widget.store.accounts.where(
-            (account) => account.role == UserRole.customer,
+        (account) => account.role == UserRole.customer,
       ),
       ...widget.store.manualCustomers,
     ];
@@ -3688,29 +3812,69 @@ class _ShopShellState extends State<ShopShell> {
     );
     if (selection == null || !mounted) return;
     final customer = selection.customer;
+    final review = await showDialog<Map<String, int>>(
+      context: context,
+      builder: (_) => _CheckoutReviewDialog(
+        cartLines: cartLines,
+        initialBillPieces: {
+          for (final line in lines) line.productId: line.pieces,
+        },
+      ),
+    );
+    if (review == null || !mounted) return;
+    lines = [];
+    pendingPieces = {};
+    for (final cartLine in cartLines) {
+      final billPieces = review[cartLine.product.id] ?? 0;
+      if (billPieces > 0) {
+        lines.add(
+          BillLine(
+            productId: cartLine.product.id,
+            name: cartLine.product.name,
+            quality: cartLine.product.quality,
+            price: cartLine.product.price,
+            pieces: billPieces,
+            orderedPieces: cartLine.pieces,
+          ),
+        );
+      }
+      final shortage = cartLine.pieces - billPieces;
+      if (shortage > 0) pendingPieces[cartLine.product.id] = shortage;
+    }
     if (widget.store.firebaseEnabled) {
       final customerUid = customer.isWalkIn
           ? null
           : customer.uid ??
-          (widget.account.role == UserRole.customer
-              ? widget.account.uid
-              : null);
+                (widget.account.role == UserRole.customer
+                    ? widget.account.uid
+                    : null);
       if (customerUid == null && !customer.isWalkIn) {
         _snack('This customer account is not connected to Firebase yet.');
         return;
       }
       try {
+        if (lines.isEmpty) {
+          await _saveShortageRequests(customer, cartLines, pendingPieces);
+          if (!mounted) return;
+          setState(() {
+            _cart.clear();
+            _page = _Page.pending;
+          });
+          await widget.store.persistCart(widget.account);
+          _snack('The order was saved as a pending stock request.');
+          return;
+        }
         final result = await FirebaseAppService.placeOrder(
           customerUid: customerUid,
           manualCustomerDocumentId: customer.isWalkIn ? customer.id : null,
           paymentMode: selection.paymentMode.name,
-          lines: _cart.values
+          lines: lines
               .map(
                 (line) => <String, Object>{
-              'productId': line.product.id,
-              'pieces': line.pieces,
-            },
-          )
+                  'productId': line.productId,
+                  'pieces': line.pieces,
+                },
+              )
               .toList(),
         );
         if (!mounted) return;
@@ -3718,6 +3882,8 @@ class _ShopShellState extends State<ShopShell> {
           _cart.clear();
           _page = _Page.orders;
         });
+        await widget.store.persistCart(widget.account);
+        await _saveShortageRequests(customer, cartLines, pendingPieces);
         await _fulfillPendingRequests(customer, lines);
         _snack('Order ${result['orderId']} placed successfully.');
       } on FirebaseFunctionsException catch (error) {
@@ -3735,20 +3901,23 @@ class _ShopShellState extends State<ShopShell> {
     final billId = 'PJ-${now.year}-$billNumber';
     final payments = selection.paymentMode == PaymentMode.cash
         ? [
-      PaymentEntry(
-        id: 'PAY-${now.millisecondsSinceEpoch}',
-        amount: lines.fold(0, (sum, line) => sum + line.total),
-        date: now,
-        note: 'Cash at order',
-      ),
-    ]
+            PaymentEntry(
+              id: 'PAY-${now.millisecondsSinceEpoch}',
+              amount: lines.fold(0, (sum, line) => sum + line.total),
+              date: now,
+              note: 'Cash at order',
+            ),
+          ]
         : <PaymentEntry>[];
     setState(() {
       final purchasedProducts = _cart.values
           .map((line) => line.product)
           .toList();
-      for (final line in _cart.values) {
-        line.product.stock -= line.pieces;
+      for (final line in lines) {
+        final product = purchasedProducts.firstWhere(
+          (item) => item.id == line.productId,
+        );
+        product.stock -= line.pieces;
       }
       widget.store.bills.insert(
         0,
@@ -3784,31 +3953,86 @@ class _ShopShellState extends State<ShopShell> {
       _page = _Page.orders;
     });
     await widget.store.persistLocalData();
+    await _saveShortageRequests(customer, cartLines, pendingPieces);
     await _fulfillPendingRequests(customer, lines);
     _snack('Order placed. Staff can see it in the orders inbox.');
   }
 
+  Future<void> _saveShortageRequests(
+    Account customer,
+    List<CartLine> cartLines,
+    Map<String, int> pendingPieces,
+  ) async {
+    if (pendingPieces.isEmpty) return;
+    for (final cartLine in cartLines) {
+      final pieces = pendingPieces[cartLine.product.id] ?? 0;
+      if (pieces <= 0) continue;
+      final id = 'PEN-${DateTime.now().microsecondsSinceEpoch}';
+      final request = PendingRequest(
+        id: id,
+        customerId: customer.id,
+        customerName: customer.name,
+        productId: cartLine.product.id,
+        productName: cartLine.product.name,
+        quality: cartLine.product.quality,
+        pricePerPiece: cartLine.product.price,
+        pieces: pieces,
+        createdAt: DateTime.now(),
+        customerUid: customer.uid ?? '',
+      );
+      if (widget.store.firebaseEnabled) {
+        final customerUid =
+            customer.uid ??
+            (widget.account.role == UserRole.customer
+                ? widget.account.uid
+                : null);
+        if (customerUid == null) {
+          _snack(
+            'The pending quantity could not be connected to this customer.',
+          );
+          continue;
+        }
+        await _persist(
+          () => FirebaseAppService.savePendingRequest(
+            id: id,
+            customerUid: customerUid,
+            customerId: customer.id,
+            customerName: customer.name,
+            productId: cartLine.product.id,
+            productName: cartLine.product.name,
+            quality: cartLine.product.quality,
+            pricePerPiece: cartLine.product.price,
+            pieces: pieces,
+          ),
+        );
+      } else {
+        widget.store.pendingRequests.add(request);
+      }
+    }
+    if (!widget.store.firebaseEnabled) await widget.store.persistLocalData();
+  }
+
   Future<void> _fulfillPendingRequests(
-      Account customer,
-      List<BillLine> purchasedLines,
-      ) async {
+    Account customer,
+    List<BillLine> purchasedLines,
+  ) async {
     final purchased = <String, int>{};
     for (final line in purchasedLines) {
       purchased.update(
         line.productId,
-            (pieces) => pieces + line.pieces,
+        (pieces) => pieces + line.pieces,
         ifAbsent: () => line.pieces,
       );
     }
     final requests =
-    widget.store.pendingRequests
-        .where(
-          (request) =>
-      request.customerId == customer.id &&
-          request.status == PendingStatus.ready,
-    )
-        .toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        widget.store.pendingRequests
+            .where(
+              (request) =>
+                  request.customerId == customer.id &&
+                  request.status == PendingStatus.ready,
+            )
+            .toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     var changed = false;
     for (final request in requests) {
       final remaining = purchased[request.productId] ?? 0;
@@ -3858,15 +4082,15 @@ class _ShopShellState extends State<ShopShell> {
     if (widget.store.firebaseEnabled) {
       final customerUid =
           request.customer.uid ??
-              (widget.account.role == UserRole.customer
-                  ? widget.account.uid
-                  : null);
+          (widget.account.role == UserRole.customer
+              ? widget.account.uid
+              : null);
       if (customerUid == null) {
         _snack('This customer account is not connected to Firebase yet.');
         return;
       }
       await _persist(
-            () => FirebaseAppService.savePendingRequest(
+        () => FirebaseAppService.savePendingRequest(
           id: 'PEN-${DateTime.now().millisecondsSinceEpoch}',
           customerUid: customerUid,
           customerId: request.customer.id,
@@ -3880,7 +4104,7 @@ class _ShopShellState extends State<ShopShell> {
       );
       if (mounted) {
         setState(
-              () => _page = widget.account.role == UserRole.customer
+          () => _page = widget.account.role == UserRole.customer
               ? _Page.pending
               : _Page.orders,
         );
@@ -3917,14 +4141,14 @@ class _ShopShellState extends State<ShopShell> {
     var available = product.stock - _reservedPieces(product);
     var changedLocally = false;
     final requests =
-    widget.store.pendingRequests
-        .where(
-          (request) =>
-      request.productId == product.id &&
-          request.status == PendingStatus.pending,
-    )
-        .toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        widget.store.pendingRequests
+            .where(
+              (request) =>
+                  request.productId == product.id &&
+                  request.status == PendingStatus.pending,
+            )
+            .toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     for (final request in requests) {
       if (available >= request.pieces) {
         request.status = PendingStatus.ready;
@@ -3944,7 +4168,7 @@ class _ShopShellState extends State<ShopShell> {
             request.documentId.isNotEmpty) {
           unawaited(
             _persist(
-                  () => FirebaseAppService.updatePendingStatus(
+              () => FirebaseAppService.updatePendingStatus(
                 request.documentId,
                 request.status.name,
               ),
@@ -3971,6 +4195,60 @@ class _ShopShellState extends State<ShopShell> {
       return;
     }
     _addToCart(product, request.pieces);
+  }
+
+  Future<void> _editPendingRequest(PendingRequest request) async {
+    if (request.status != PendingStatus.pending) {
+      _snack('Only requests still waiting for stock can be edited.');
+      return;
+    }
+    final pieces = await showDialog<int>(
+      context: context,
+      builder: (_) => _EditPendingPiecesDialog(request: request),
+    );
+    if (pieces == null || pieces == request.pieces || !mounted) return;
+    if (widget.store.firebaseEnabled) {
+      if (request.documentId.isEmpty) {
+        _snack('This pending request is not connected to the store database.');
+        return;
+      }
+      await _persist(
+        () => FirebaseAppService.updatePendingRequest(
+          documentId: request.documentId,
+          pieces: pieces,
+        ),
+      );
+    }
+    setState(() => request.pieces = pieces);
+    if (!widget.store.firebaseEnabled) await widget.store.persistLocalData();
+  }
+
+  Future<void> _deletePendingRequest(PendingRequest request) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove pending item?'),
+        content: Text('Remove ${request.productName} from pending items?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    if (widget.store.firebaseEnabled && request.documentId.isNotEmpty) {
+      await _persist(
+        () => FirebaseAppService.deletePendingRequest(request.documentId),
+      );
+    }
+    setState(() => widget.store.pendingRequests.remove(request));
+    if (!widget.store.firebaseEnabled) await widget.store.persistLocalData();
   }
 
   Future<void> _editBillLineQuantity(Bill bill, int lineIndex) async {
@@ -4034,7 +4312,7 @@ class _ShopShellState extends State<ShopShell> {
     }
     final pendingId = 'bill-${bill.id}-$lineIndex';
     final pendingIndex = widget.store.pendingRequests.indexWhere(
-          (request) => request.id == pendingId,
+      (request) => request.id == pendingId,
     );
     if (pendingIndex >= 0 &&
         widget.store.pendingRequests[pendingIndex].status ==
@@ -4057,10 +4335,10 @@ class _ShopShellState extends State<ShopShell> {
         orderedPieces: line.orderedPieces,
       );
       for (final order in widget.store.orders.where(
-            (order) => order.billId == bill.id,
+        (order) => order.billId == bill.id,
       )) {
         final orderLineIndex = order.lines.indexWhere(
-              (orderLine) => orderLine.productId == line.productId,
+          (orderLine) => orderLine.productId == line.productId,
         );
         if (orderLineIndex >= 0) {
           order.lines[orderLineIndex] = BillLine(
@@ -4166,26 +4444,45 @@ class _ShopShellState extends State<ShopShell> {
       final document = _createReceiptPdf(widget.store.business, bill);
       final bytes = await document.save();
 
-      Directory? targetDir;
-      try {
-        final docs = await getApplicationDocumentsDirectory();
-        final pDir = Directory('${docs.path}/ProgressiveJewellery/Bills');
-        await pDir.create(recursive: true);
-        if (await pDir.exists()) targetDir = pDir;
-      } catch (_) {}
-
-      if (targetDir == null) {
+      File file;
+      if (Platform.isWindows) {
+        final selectedUri = await FilePicker.saveFile(
+          dialogTitle: 'Save receipt',
+          fileName: '${bill.id}.pdf',
+          bytes: bytes,
+          type: FileType.custom,
+          allowedExtensions: ['pdf'],
+        );
+        if (selectedUri == null) {
+          if (mounted) _snack('Receipt download cancelled.');
+          return;
+        }
+        final selectedPath = selectedUri.toFilePath();
+        final path = selectedPath.toLowerCase().endsWith('.pdf')
+            ? selectedPath
+            : '$selectedPath.pdf';
+        file = File(path);
+      } else {
+        Directory? targetDir;
         try {
-          final supp = await getApplicationSupportDirectory();
-          final pDir = Directory('${supp.path}/ProgressiveJewellery/Bills');
+          final docs = await getApplicationDocumentsDirectory();
+          final pDir = Directory('${docs.path}/ProgressiveJewellery/Bills');
           await pDir.create(recursive: true);
           if (await pDir.exists()) targetDir = pDir;
         } catch (_) {}
+
+        if (targetDir == null) {
+          try {
+            final supp = await getApplicationSupportDirectory();
+            final pDir = Directory('${supp.path}/ProgressiveJewellery/Bills');
+            await pDir.create(recursive: true);
+            if (await pDir.exists()) targetDir = pDir;
+          } catch (_) {}
+        }
+
+        targetDir ??= Directory.systemTemp;
+        file = File('${targetDir.path}/${bill.id}.pdf');
       }
-
-      targetDir ??= Directory.systemTemp;
-
-      final file = File('${targetDir.path}/${bill.id}.pdf');
       await file.writeAsBytes(bytes, flush: true);
 
       if (Platform.isWindows) {
@@ -4300,6 +4597,7 @@ class ProductCard extends StatefulWidget {
     required this.product,
     required this.allowCart,
     required this.availablePieces,
+    this.showStock = true,
     required this.onAdd,
     required this.onRequestPending,
     required this.onOpenDetails,
@@ -4308,6 +4606,7 @@ class ProductCard extends StatefulWidget {
   final Product product;
   final bool allowCart;
   final int availablePieces;
+  final bool showStock;
   final ValueChanged<int> onAdd;
   final VoidCallback onRequestPending;
   final VoidCallback onOpenDetails;
@@ -4357,16 +4656,17 @@ class _ProductCardState extends State<ProductCard> {
                     top: 13,
                     child: _Badge(text: product.category.toUpperCase()),
                   ),
-                  Positioned(
-                    right: 13,
-                    top: 13,
-                    child: _Badge(
-                      text: widget.availablePieces > 0
-                          ? '${widget.availablePieces} PIECES'
-                          : 'OUT OF STOCK',
-                      muted: widget.availablePieces == 0,
+                  if (widget.showStock)
+                    Positioned(
+                      right: 13,
+                      top: 13,
+                      child: _Badge(
+                        text: widget.availablePieces > 0
+                            ? '${widget.availablePieces} PIECES'
+                            : 'OUT OF STOCK',
+                        muted: widget.availablePieces == 0,
+                      ),
                     ),
-                  ),
                   Positioned(
                     left: 18,
                     right: 18,
@@ -4487,7 +4787,11 @@ class _ProductCardState extends State<ProductCard> {
                             onPressed: widget.onInquire,
                             tooltip: 'Inquire about product',
                             visualDensity: VisualDensity.compact,
-                            icon: const Icon(Icons.chat_bubble_outline, size: 18, color: _gold),
+                            icon: const Icon(
+                              Icons.chat_bubble_outline,
+                              size: 18,
+                              color: _gold,
+                            ),
                           ),
                         ],
                       )
@@ -4528,6 +4832,7 @@ class _ProductDetailsPage extends StatefulWidget {
     required this.product,
     required this.allowCart,
     required this.availablePieces,
+    this.showStock = true,
     required this.onAdd,
     required this.onRequestPending,
   });
@@ -4535,6 +4840,7 @@ class _ProductDetailsPage extends StatefulWidget {
   final Product product;
   final bool allowCart;
   final int availablePieces;
+  final bool showStock;
   final ValueChanged<int> onAdd;
   final VoidCallback onRequestPending;
 
@@ -4590,13 +4896,14 @@ class _ProductDetailsPageState extends State<_ProductDetailsPage> {
           runSpacing: 10,
           children: [
             _MiniMetric(label: 'PRODUCT ID', value: product.id),
-            _MiniMetric(
-              label: 'AVAILABLE',
-              value: inStock
-                  ? '${widget.availablePieces} pieces'
-                  : 'Out of stock',
-              emphasis: !inStock,
-            ),
+            if (widget.showStock)
+              _MiniMetric(
+                label: 'AVAILABLE',
+                value: inStock
+                    ? '${widget.availablePieces} pieces'
+                    : 'Out of stock',
+                emphasis: !inStock,
+              ),
           ],
         ),
         if (product.description.trim().isNotEmpty) ...[
@@ -4673,21 +4980,21 @@ class _ProductDetailsPageState extends State<_ProductDetailsPage> {
                   constraints: const BoxConstraints(maxWidth: 1080),
                   child: wide
                       ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: image),
-                      const SizedBox(width: 40),
-                      Expanded(child: details),
-                    ],
-                  )
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: image),
+                            const SizedBox(width: 40),
+                            Expanded(child: details),
+                          ],
+                        )
                       : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      image,
-                      const SizedBox(height: 26),
-                      details,
-                    ],
-                  ),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            image,
+                            const SizedBox(height: 26),
+                            details,
+                          ],
+                        ),
                 ),
               ),
             );
@@ -4713,7 +5020,9 @@ class _PieceQuantityPicker extends StatefulWidget {
 }
 
 class _PieceQuantityPickerState extends State<_PieceQuantityPicker> {
-  late final TextEditingController _controller = TextEditingController(text: widget.pieces.toString());
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.pieces.toString(),
+  );
   final _focusNode = FocusNode();
 
   @override
@@ -4747,7 +5056,9 @@ class _PieceQuantityPickerState extends State<_PieceQuantityPicker> {
       newPieces = 1;
     } else if (newPieces > widget.maximum) {
       newPieces = widget.maximum;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Only ${widget.maximum} pieces available.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Only ${widget.maximum} pieces available.')),
+      );
     }
 
     if (newPieces != widget.pieces) {
@@ -4770,7 +5081,9 @@ class _PieceQuantityPickerState extends State<_PieceQuantityPicker> {
       children: [
         _QtyButton(
           icon: Icons.remove,
-          onPressed: widget.pieces > 1 ? () => widget.onChanged(widget.pieces - 1) : null,
+          onPressed: widget.pieces > 1
+              ? () => widget.onChanged(widget.pieces - 1)
+              : null,
         ),
         SizedBox(
           width: 40,
@@ -4797,7 +5110,9 @@ class _PieceQuantityPickerState extends State<_PieceQuantityPicker> {
         ),
         _QtyButton(
           icon: Icons.add,
-          onPressed: widget.pieces < widget.maximum ? () => widget.onChanged(widget.pieces + 1) : null,
+          onPressed: widget.pieces < widget.maximum
+              ? () => widget.onChanged(widget.pieces + 1)
+              : null,
         ),
       ],
     ),
@@ -4837,17 +5152,17 @@ class ProductImage extends StatelessWidget {
         loadingBuilder: (context, child, progress) => progress == null
             ? child
             : Stack(
-          fit: StackFit.expand,
-          children: [
-            _placeholder(),
-            const Center(
-              child: CircularProgressIndicator(
-                color: _gold,
-                strokeWidth: 2,
+                fit: StackFit.expand,
+                children: [
+                  _placeholder(),
+                  const Center(
+                    child: CircularProgressIndicator(
+                      color: _gold,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -4943,30 +5258,30 @@ class InventoryPage extends StatelessWidget {
     ),
     child: products.isEmpty
         ? const _EmptyState(
-      icon: Icons.inventory_2_outlined,
-      title: 'Your inventory is empty',
-      text: 'Add a product to start your collection.',
-    )
+            icon: Icons.inventory_2_outlined,
+            title: 'Your inventory is empty',
+            text: 'Add a product to start your collection.',
+          )
         : Column(
-      children: products
-          .map(
-            (product) => _ProductRow(
-          product: product,
-          pendingRequests: pendingRequests
-              .where((request) => request.productId == product.id)
-              .toList(),
-          onChanged: () => onChanged(product),
-          onEdit: () => _showProductForm(context, product: product),
-        ),
-      )
-          .toList(),
-    ),
+            children: products
+                .map(
+                  (product) => _ProductRow(
+                    product: product,
+                    pendingRequests: pendingRequests
+                        .where((request) => request.productId == product.id)
+                        .toList(),
+                    onChanged: () => onChanged(product),
+                    onEdit: () => _showProductForm(context, product: product),
+                  ),
+                )
+                .toList(),
+          ),
   );
 
   Future<void> _showProductForm(
-      BuildContext context, {
-        Product? product,
-      }) async {
+    BuildContext context, {
+    Product? product,
+  }) async {
     final result = await showDialog<dynamic>(
       context: context,
       builder: (_) => _ProductForm(
@@ -5253,8 +5568,8 @@ class _ProductFormState extends State<_ProductForm> {
                             ),
                             required: true,
                             validator: (v) =>
-                            double.tryParse(v ?? '') == null ||
-                                double.parse(v!) <= 0
+                                double.tryParse(v ?? '') == null ||
+                                    double.parse(v!) <= 0
                                 ? 'Enter a valid price'
                                 : null,
                           ),
@@ -5267,8 +5582,8 @@ class _ProductFormState extends State<_ProductForm> {
                             keyboard: TextInputType.number,
                             required: true,
                             validator: (v) =>
-                            int.tryParse(v ?? '') == null ||
-                                int.parse(v!) < 0
+                                int.tryParse(v ?? '') == null ||
+                                    int.parse(v!) < 0
                                 ? 'Enter a valid stock count'
                                 : null,
                           ),
@@ -5287,10 +5602,10 @@ class _ProductFormState extends State<_ProductForm> {
                             items: (_categories.toList()..sort())
                                 .map(
                                   (value) => DropdownMenuItem(
-                                value: value,
-                                child: Text(value),
-                              ),
-                            )
+                                    value: value,
+                                    child: Text(value),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (value) =>
                                 setState(() => _category = value ?? _category),
@@ -5397,7 +5712,7 @@ class _ProductFormState extends State<_ProductForm> {
     if (name == null || !mounted) return;
     final normalized = name.trim();
     if (_categories.any(
-          (item) => item.toLowerCase() == normalized.toLowerCase(),
+      (item) => item.toLowerCase() == normalized.toLowerCase(),
     )) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('That category already exists.')),
@@ -5412,22 +5727,22 @@ class _ProductFormState extends State<_ProductForm> {
   }
 
   Widget _field(
-      TextEditingController controller,
-      String label, {
-        String? hint,
-        bool required = false,
-        TextInputType? keyboard,
-        int maxLines = 1,
-        String? Function(String?)? validator,
-        ValueChanged<String>? onChanged,
-      }) => TextFormField(
+    TextEditingController controller,
+    String label, {
+    String? hint,
+    bool required = false,
+    TextInputType? keyboard,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+    ValueChanged<String>? onChanged,
+  }) => TextFormField(
     controller: controller,
     keyboardType: keyboard,
     maxLines: maxLines,
     onChanged: onChanged,
     decoration: InputDecoration(labelText: label, hintText: hint),
     validator:
-    validator ??
+        validator ??
         (required
             ? (v) => v == null || v.trim().isEmpty ? 'Enter $label' : null
             : null),
@@ -5485,7 +5800,7 @@ class _NewCategoryDialogState extends State<_NewCategoryDialog> {
           final name = value?.trim() ?? '';
           if (name.isEmpty) return 'Enter a category name';
           if (widget.categories.any(
-                (item) => item.toLowerCase() == name.toLowerCase(),
+            (item) => item.toLowerCase() == name.toLowerCase(),
           )) {
             return 'This category already exists';
           }
@@ -5530,67 +5845,67 @@ class CartPage extends StatelessWidget {
       eyebrow: 'YOUR SELECTION',
       title: 'Your bag',
       description:
-      '${lines.fold<int>(0, (sum, line) => sum + line.pieces)} pieces selected',
+          '${lines.fold<int>(0, (sum, line) => sum + line.pieces)} pieces selected',
       child: lines.isEmpty
           ? const _EmptyState(
-        icon: Icons.shopping_bag_outlined,
-        title: 'Your bag is waiting',
-        text: 'Add a piece from the collection to see it here.',
-      )
+              icon: Icons.shopping_bag_outlined,
+              title: 'Your bag is waiting',
+              text: 'Add a piece from the collection to see it here.',
+            )
           : Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ...lines.map(
-                (line) => _CartLineCard(line: line, onChanged: onChanged),
-          ),
-          const SizedBox(height: 15),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: _line),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SummaryRow(label: 'Subtotal', value: _money(total)),
-                const SizedBox(height: 13),
-                const Divider(color: _line),
-                const SizedBox(height: 9),
-                _SummaryRow(
-                  label: 'Total',
-                  value: _money(total),
-                  strong: true,
+                ...lines.map(
+                  (line) => _CartLineCard(line: line, onChanged: onChanged),
                 ),
-                const SizedBox(height: 17),
-                SizedBox(
-                  width: double.infinity,
-                  height: 49,
-                  child: FilledButton.icon(
-                    onPressed: allowOrdering ? onCheckout : null,
-                    icon: const Icon(
-                      Icons.receipt_long_outlined,
-                      size: 18,
-                    ),
-                    label: const Text('Place order'),
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: _line),
+                    borderRadius: BorderRadius.circular(18),
                   ),
-                ),
-                const SizedBox(height: 9),
-                Text(
-                  allowOrdering
-                      ? 'Placing the order creates an invoice and deducts pieces from stock.'
-                      : 'You need order permission to place an order.',
-                  style: TextStyle(
-                    color: _muted,
-                    fontFamily: 'Arial',
-                    fontSize: 11,
+                  child: Column(
+                    children: [
+                      _SummaryRow(label: 'Subtotal', value: _money(total)),
+                      const SizedBox(height: 13),
+                      const Divider(color: _line),
+                      const SizedBox(height: 9),
+                      _SummaryRow(
+                        label: 'Total',
+                        value: _money(total),
+                        strong: true,
+                      ),
+                      const SizedBox(height: 17),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 49,
+                        child: FilledButton.icon(
+                          onPressed: allowOrdering ? onCheckout : null,
+                          icon: const Icon(
+                            Icons.receipt_long_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Place order'),
+                        ),
+                      ),
+                      const SizedBox(height: 9),
+                      Text(
+                        allowOrdering
+                            ? 'Placing the order creates an invoice and deducts pieces from stock.'
+                            : 'You need order permission to place an order.',
+                        style: TextStyle(
+                          color: _muted,
+                          fontFamily: 'Arial',
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -5676,31 +5991,38 @@ class _CartLineCard extends StatelessWidget {
         ),
         child: compact
             ? Column(
-          children: [
-            Row(children: [image, const SizedBox(width: 12), details, removeButton]),
-            const SizedBox(height: 11),
-            Row(
-              children: [
-                const Spacer(),
-                quantity,
-                const SizedBox(width: 10),
-                total,
-              ],
-            ),
-          ],
-        )
+                children: [
+                  Row(
+                    children: [
+                      image,
+                      const SizedBox(width: 12),
+                      details,
+                      removeButton,
+                    ],
+                  ),
+                  const SizedBox(height: 11),
+                  Row(
+                    children: [
+                      const Spacer(),
+                      quantity,
+                      const SizedBox(width: 10),
+                      total,
+                    ],
+                  ),
+                ],
+              )
             : Row(
-          children: [
-            image,
-            const SizedBox(width: 14),
-            details,
-            quantity,
-            const SizedBox(width: 10),
-            SizedBox(width: 82, child: total),
-            const SizedBox(width: 4),
-            removeButton,
-          ],
-        ),
+                children: [
+                  image,
+                  const SizedBox(width: 14),
+                  details,
+                  quantity,
+                  const SizedBox(width: 10),
+                  SizedBox(width: 82, child: total),
+                  const SizedBox(width: 4),
+                  removeButton,
+                ],
+              ),
       );
     },
   );
@@ -5716,7 +6038,9 @@ class _QuantityControl extends StatefulWidget {
 }
 
 class _QuantityControlState extends State<_QuantityControl> {
-  late final TextEditingController _controller = TextEditingController(text: widget.line.pieces.toString());
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.line.pieces.toString(),
+  );
   final _focusNode = FocusNode();
 
   @override
@@ -5732,7 +6056,8 @@ class _QuantityControlState extends State<_QuantityControl> {
   @override
   void didUpdateWidget(covariant _QuantityControl oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_focusNode.hasFocus && _controller.text != widget.line.pieces.toString()) {
+    if (!_focusNode.hasFocus &&
+        _controller.text != widget.line.pieces.toString()) {
       _controller.text = widget.line.pieces.toString();
     }
   }
@@ -5746,7 +6071,9 @@ class _QuantityControlState extends State<_QuantityControl> {
 
   void _updateQuantity() {
     final shell = context.findAncestorStateOfType<_ShopShellState>();
-    final available = shell?._availablePieces(widget.line.product) ?? widget.line.product.stock;
+    final available =
+        shell?._availablePieces(widget.line.product) ??
+        widget.line.product.stock;
     final maxAllowed = available + widget.line.pieces;
 
     int? newPieces = int.tryParse(_controller.text);
@@ -5754,7 +6081,9 @@ class _QuantityControlState extends State<_QuantityControl> {
       newPieces = 1;
     } else if (newPieces > maxAllowed) {
       newPieces = maxAllowed;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Only $maxAllowed pieces available.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Only $maxAllowed pieces available.')),
+      );
     }
 
     if (newPieces != widget.line.pieces) {
@@ -5822,9 +6151,9 @@ class _QuantityControlState extends State<_QuantityControl> {
             icon: Icons.add,
             onPressed: canAdd
                 ? () {
-              widget.line.pieces++;
-              widget.onChanged();
-            }
+                    widget.line.pieces++;
+                    widget.onChanged();
+                  }
                 : null,
           ),
         ],
@@ -5845,6 +6174,119 @@ class _QtyButton extends StatelessWidget {
     constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
     padding: EdgeInsets.zero,
     icon: Icon(icon, color: onPressed == null ? _line : _ink),
+  );
+}
+
+class _CheckoutReviewDialog extends StatefulWidget {
+  const _CheckoutReviewDialog({
+    required this.cartLines,
+    required this.initialBillPieces,
+  });
+
+  final List<CartLine> cartLines;
+  final Map<String, int> initialBillPieces;
+
+  @override
+  State<_CheckoutReviewDialog> createState() => _CheckoutReviewDialogState();
+}
+
+class _CheckoutReviewDialogState extends State<_CheckoutReviewDialog> {
+  late final Map<String, TextEditingController> _controllers = {
+    for (final line in widget.cartLines)
+      line.product.id: TextEditingController(
+        text: '${widget.initialBillPieces[line.product.id] ?? 0}',
+      ),
+  };
+
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Review order before billing'),
+    content: SizedBox(
+      width: 520,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widget.cartLines.map((line) {
+            final controller = _controllers[line.product.id]!;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(line.product.name),
+                        Text(
+                          '${line.product.id} · requested ${line.pieces} pieces',
+                          style: const TextStyle(
+                            fontFamily: 'Arial',
+                            color: _muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 90,
+                    child: TextField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        labelText: 'Bill',
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Back'),
+      ),
+      FilledButton.icon(
+        onPressed: () {
+          final result = <String, int>{};
+          for (final line in widget.cartLines) {
+            final pieces = int.tryParse(
+              _controllers[line.product.id]!.text.trim(),
+            );
+            final maximum =
+                widget.initialBillPieces[line.product.id] ?? line.pieces;
+            if (pieces == null || pieces < 0 || pieces > maximum) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Bill quantity for ${line.product.name} must be between 0 and $maximum.',
+                  ),
+                ),
+              );
+              return;
+            }
+            result[line.product.id] = pieces;
+          }
+          Navigator.pop(context, result);
+        },
+        icon: const Icon(Icons.check, size: 18),
+        label: const Text('Finalize bill'),
+      ),
+    ],
   );
 }
 
@@ -5910,13 +6352,13 @@ class _CheckoutDialogState extends State<_CheckoutDialog> {
                 items: _customers
                     .map(
                       (customer) => DropdownMenuItem(
-                    value: customer,
-                    child: Text(
-                      '${customer.name}${customer.phone.isEmpty ? '' : ' ? ${customer.phone}'}',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                )
+                        value: customer,
+                        child: Text(
+                          '${customer.name}${customer.phone.isEmpty ? '' : ' ? ${customer.phone}'}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (customer) => setState(() => _selected = customer),
               )
@@ -6008,14 +6450,14 @@ class _CheckoutDialogState extends State<_CheckoutDialog> {
         onPressed: _selected == null
             ? null
             : () => Navigator.pop(
-          context,
-          _CheckoutSelection(
-            customer: _selected!,
-            paymentMode: widget.currentAccount.role == UserRole.customer
-                ? PaymentMode.credit
-                : _paymentMode,
-          ),
-        ),
+                context,
+                _CheckoutSelection(
+                  customer: _selected!,
+                  paymentMode: widget.currentAccount.role == UserRole.customer
+                      ? PaymentMode.credit
+                      : _paymentMode,
+                ),
+              ),
         child: const Text('Place order'),
       ),
     ],
@@ -6125,109 +6567,109 @@ class ProductionTasksPage extends StatelessWidget {
     description: 'Workers see the product, current stock, and requested quantity assigned by the store team.',
     action: canAssign
         ? FilledButton.icon(
-      onPressed: products.isEmpty || workers.isEmpty
-          ? null
-          : () => _showAssignmentDialog(context),
-      icon: const Icon(Icons.add_task, size: 18),
-      label: const Text('Assign work'),
-    )
+            onPressed: products.isEmpty || workers.isEmpty
+                ? null
+                : () => _showAssignmentDialog(context),
+            icon: const Icon(Icons.add_task, size: 18),
+            label: const Text('Assign work'),
+          )
         : null,
     child: tasks.isEmpty
         ? _EmptyState(
-      icon: Icons.precision_manufacturing_outlined,
-      title: canAssign ? 'No production tasks yet' : 'No work assigned',
-      text: canAssign
-          ? 'Assign a product and quantity to a worker when stock needs replenishing.'
-          : 'New tasks from the owner or admin will appear here with the current stock count.',
-    )
+            icon: Icons.precision_manufacturing_outlined,
+            title: canAssign ? 'No production tasks yet' : 'No work assigned',
+            text: canAssign
+                ? 'Assign a product and quantity to a worker when stock needs replenishing.'
+                : 'New tasks from the owner or admin will appear here with the current stock count.',
+          )
         : Column(
-      children: tasks.map((task) {
-        final nextStatus = switch (task.status) {
-          ProductionTaskStatus.assigned =>
-          ProductionTaskStatus.inProgress,
-          ProductionTaskStatus.inProgress =>
-          ProductionTaskStatus.completed,
-          ProductionTaskStatus.completed => null,
-        };
-        final actionLabel = task.status == ProductionTaskStatus.assigned
-            ? 'Start work'
-            : 'Mark complete';
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: _line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      task.productName,
-                      style: const TextStyle(fontSize: 18),
+            children: tasks.map((task) {
+              final nextStatus = switch (task.status) {
+                ProductionTaskStatus.assigned =>
+                  ProductionTaskStatus.inProgress,
+                ProductionTaskStatus.inProgress =>
+                  ProductionTaskStatus.completed,
+                ProductionTaskStatus.completed => null,
+              };
+              final actionLabel = task.status == ProductionTaskStatus.assigned
+                  ? 'Start work'
+                  : 'Mark complete';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: _line),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            task.productName,
+                            style: const TextStyle(fontSize: 18),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF4EFE3),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _productionStatusLabel(task.status),
+                            style: const TextStyle(
+                              fontFamily: 'Arial',
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF4EFE3),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      _productionStatusLabel(task.status),
+                    const SizedBox(height: 7),
+                    Text(
+                      'Product ${task.productId} · Stock when assigned: ${task.currentStock} · Make: ${task.piecesToMake}',
                       style: const TextStyle(
                         fontFamily: 'Arial',
-                        fontSize: 10,
+                        color: _muted,
+                        fontSize: 12,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 7),
-              Text(
-                'Product ${task.productId} · Stock when assigned: ${task.currentStock} · Make: ${task.piecesToMake}',
-                style: const TextStyle(
-                  fontFamily: 'Arial',
-                  color: _muted,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                'Assigned to ${task.workerName} by ${task.assignedByName}',
-                style: const TextStyle(
-                  fontFamily: 'Arial',
-                  color: _muted,
-                  fontSize: 11,
-                ),
-              ),
-              if (nextStatus != null) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton.icon(
-                    onPressed: () => onStatusChanged(task, nextStatus),
-                    icon: Icon(
-                      task.status == ProductionTaskStatus.assigned
-                          ? Icons.play_arrow
-                          : Icons.done_all,
+                    const SizedBox(height: 5),
+                    Text(
+                      'Assigned to ${task.workerName} by ${task.assignedByName}',
+                      style: const TextStyle(
+                        fontFamily: 'Arial',
+                        color: _muted,
+                        fontSize: 11,
+                      ),
                     ),
-                    label: Text(actionLabel),
-                  ),
+                    if (nextStatus != null) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton.icon(
+                          onPressed: () => onStatusChanged(task, nextStatus),
+                          icon: Icon(
+                            task.status == ProductionTaskStatus.assigned
+                                ? Icons.play_arrow
+                                : Icons.done_all,
+                          ),
+                          label: Text(actionLabel),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-            ],
+              );
+            }).toList(),
           ),
-        );
-      }).toList(),
-    ),
   );
 }
 
@@ -6292,13 +6734,13 @@ class _ProductionAssignmentDialogState
               items: widget.products
                   .map(
                     (product) => DropdownMenuItem(
-                  value: product,
-                  child: Text(
-                    '${product.name} · stock ${product.stock}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              )
+                      value: product,
+                      child: Text(
+                        '${product.name} · stock ${product.stock}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
                   .toList(),
               onChanged: (product) => setState(() => _product = product),
             ),
@@ -6309,10 +6751,10 @@ class _ProductionAssignmentDialogState
               items: widget.workers
                   .map(
                     (worker) => DropdownMenuItem(
-                  value: worker,
-                  child: Text(worker.name, overflow: TextOverflow.ellipsis),
-                ),
-              )
+                      value: worker,
+                      child: Text(worker.name, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
                   .toList(),
               onChanged: (worker) => setState(() => _worker = worker),
             ),
@@ -6322,7 +6764,7 @@ class _ProductionAssignmentDialogState
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Pieces to make'),
               validator: (value) =>
-              int.tryParse(value ?? '') == null || int.parse(value!) < 1
+                  int.tryParse(value ?? '') == null || int.parse(value!) < 1
                   ? 'Enter at least 1 piece'
                   : null,
             ),
@@ -6339,16 +6781,16 @@ class _ProductionAssignmentDialogState
         onPressed: _product == null || _worker == null
             ? null
             : () {
-          if (!_formKey.currentState!.validate()) return;
-          Navigator.pop(
-            context,
-            _ProductionDraft(
-              product: _product!,
-              worker: _worker!,
-              pieces: int.parse(_pieces.text),
-            ),
-          );
-        },
+                if (!_formKey.currentState!.validate()) return;
+                Navigator.pop(
+                  context,
+                  _ProductionDraft(
+                    product: _product!,
+                    worker: _worker!,
+                    pieces: int.parse(_pieces.text),
+                  ),
+                );
+              },
         child: const Text('Assign task'),
       ),
     ],
@@ -6418,10 +6860,10 @@ class _PendingRequestDialogState extends State<_PendingRequestDialog> {
                 items: widget.customers
                     .map(
                       (customer) => DropdownMenuItem(
-                    value: customer,
-                    child: Text('${customer.name} · ${customer.id}'),
-                  ),
-                )
+                        value: customer,
+                        child: Text('${customer.name} · ${customer.id}'),
+                      ),
+                    )
                     .toList(),
                 onChanged: (customer) {
                   if (customer != null) setState(() => _selected = customer);
@@ -6434,7 +6876,7 @@ class _PendingRequestDialogState extends State<_PendingRequestDialog> {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Pieces requested'),
               validator: (value) =>
-              int.tryParse(value ?? '') == null || int.parse(value!) < 1
+                  int.tryParse(value ?? '') == null || int.parse(value!) < 1
                   ? 'Enter at least 1 piece'
                   : null,
             ),
@@ -6482,7 +6924,9 @@ class BillsPage extends StatelessWidget {
     this.onEditLineQuantity,
     this.onDelete,
     this.onAddSale,
+    this.onRecordPayment,
   });
+  final void Function(Bill bill)? onRecordPayment;
   final List<Bill> bills;
   final ValueChanged<Bill> onDownload;
   final bool canEditPrices;
@@ -6499,33 +6943,33 @@ class BillsPage extends StatelessWidget {
     action: onAddSale == null
         ? null
         : FilledButton.icon(
-      onPressed: onAddSale,
-      icon: const Icon(Icons.add_shopping_cart, size: 18),
-      label: const Text('Add sale'),
-    ),
+            onPressed: onAddSale,
+            icon: const Icon(Icons.add_shopping_cart, size: 18),
+            label: const Text('Add sale'),
+          ),
     child: bills.isEmpty
         ? const _EmptyState(
-      icon: Icons.receipt_long_outlined,
-      title: 'No bills yet',
-      text: 'Create a sale from the shop to see its bill here.',
-    )
+            icon: Icons.receipt_long_outlined,
+            title: 'No bills yet',
+            text: 'Create a sale from the shop to see its bill here.',
+          )
         : Column(
-      children: bills
-          .map(
-            (bill) => _BillCard(
-          bill: bill,
-          onDownload: onDownload,
-          canEdit: canEditPrices,
-          onSaveLines: onSaveLines,
-          onEditLinePrice: canEditPrices ? onEditLinePrice : null,
-          onEditLineQuantity: canEditPrices
-              ? onEditLineQuantity
-              : null,
-          onDelete: onDelete != null ? () => onDelete!(bill) : null,
-        ),
-      )
-          .toList(),
-    ),
+            children: bills
+                .map(
+                  (bill) => _BillCard(
+                    bill: bill,
+                    onDownload: onDownload,
+                    canEdit: canEditPrices,
+                    onSaveLines: onSaveLines,
+                    onEditLinePrice: canEditPrices ? onEditLinePrice : null,
+                    onEditLineQuantity: canEditPrices
+                        ? onEditLineQuantity
+                        : null,
+                    onDelete: onDelete != null ? () => onDelete!(bill) : null,
+                  ),
+                )
+                .toList(),
+          ),
   );
 }
 
@@ -6554,7 +6998,7 @@ class CustomerDashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final balance = bills.fold<double>(
       0,
-          (total, bill) => total + bill.balance,
+      (total, bill) => total + bill.balance,
     );
     final openPending = pendingRequests
         .where((request) => request.status != PendingStatus.fulfilled)
@@ -6619,7 +7063,7 @@ class CustomerDashboardPage extends StatelessWidget {
                   ...orders.take(4).map((order) {
                     final pieces = order.lines.fold<int>(
                       0,
-                          (total, line) => total + line.pieces,
+                      (total, line) => total + line.pieces,
                     );
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -6734,7 +7178,14 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text('Bill ${widget.bill.id}', style: const TextStyle(fontFamily: 'Arial', color: Colors.black87, fontSize: 16)),
+        title: Text(
+          'Bill ${widget.bill.id}',
+          style: const TextStyle(
+            fontFamily: 'Arial',
+            color: Colors.black87,
+            fontSize: 16,
+          ),
+        ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.black87),
       ),
@@ -6759,22 +7210,63 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(widget.bill.id, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Arial')),
-                          _Badge(text: widget.bill.paymentMode.name.toUpperCase(), muted: widget.bill.balance > 0),
+                          Text(
+                            widget.bill.id,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Arial',
+                            ),
+                          ),
+                          _Badge(
+                            text: widget.bill.paymentMode.name.toUpperCase(),
+                            muted: widget.bill.balance > 0,
+                          ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text('Customer: ${widget.bill.customer} (${widget.bill.customerId})', style: const TextStyle(color: _muted, fontFamily: 'Arial', fontSize: 13)),
+                      Text(
+                        'Customer: ${widget.bill.customer} (${widget.bill.customerId})',
+                        style: const TextStyle(
+                          color: _muted,
+                          fontFamily: 'Arial',
+                          fontSize: 13,
+                        ),
+                      ),
                       if (widget.bill.createdByName.isNotEmpty)
-                        Text('Sale created by: ${widget.bill.createdByName}', style: const TextStyle(color: _muted, fontFamily: 'Arial', fontSize: 12)),
-                      Text('Date: ${_date(widget.bill.createdAt)}', style: const TextStyle(color: _muted, fontFamily: 'Arial', fontSize: 12)),
+                        Text(
+                          'Sale created by: ${widget.bill.createdByName}',
+                          style: const TextStyle(
+                            color: _muted,
+                            fontFamily: 'Arial',
+                            fontSize: 12,
+                          ),
+                        ),
+                      Text(
+                        'Date: ${_date(widget.bill.createdAt)}',
+                        style: const TextStyle(
+                          color: _muted,
+                          fontFamily: 'Arial',
+                          fontSize: 12,
+                        ),
+                      ),
                       const Divider(color: _line, height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _SummaryRow(label: 'Total Amount', value: _money(widget.bill.total)),
-                          _SummaryRow(label: 'Paid', value: _money(widget.bill.paid)),
-                          _SummaryRow(label: 'Balance Due', value: _money(widget.bill.balance), strong: widget.bill.balance > 0),
+                          _SummaryRow(
+                            label: 'Total Amount',
+                            value: _money(widget.bill.total),
+                          ),
+                          _SummaryRow(
+                            label: 'Paid',
+                            value: _money(widget.bill.paid),
+                          ),
+                          _SummaryRow(
+                            label: 'Balance Due',
+                            value: _money(widget.bill.balance),
+                            strong: widget.bill.balance > 0,
+                          ),
                         ],
                       ),
                     ],
@@ -6794,11 +7286,27 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Bill Line Items', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Arial')),
+                          const Text(
+                            'Bill Line Items',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Arial',
+                            ),
+                          ),
                           if (widget.canEdit)
                             FilledButton.icon(
                               onPressed: _saving ? null : _saveAll,
-                              icon: _saving ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save, size: 16),
+                              icon: _saving
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.save, size: 16),
                               label: const Text('Save All Changes'),
                             ),
                         ],
@@ -6817,8 +7325,21 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(line.name, style: const TextStyle(fontSize: 14, fontFamily: 'Arial')),
-                                    Text('${line.productId} · ${line.quality}', style: const TextStyle(color: _muted, fontSize: 11, fontFamily: 'Arial')),
+                                    Text(
+                                      line.name,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontFamily: 'Arial',
+                                      ),
+                                    ),
+                                    Text(
+                                      '${line.productId} · ${line.quality}',
+                                      style: const TextStyle(
+                                        color: _muted,
+                                        fontSize: 11,
+                                        fontFamily: 'Arial',
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -6830,14 +7351,24 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
                                           controller: _pieceControllers[index],
                                           keyboardType: TextInputType.number,
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(fontSize: 12, fontFamily: 'Arial'),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontFamily: 'Arial',
+                                          ),
                                           decoration: const InputDecoration(
                                             border: OutlineInputBorder(),
                                             contentPadding: EdgeInsets.zero,
                                           ),
                                         ),
                                       )
-                                    : Text('${line.pieces}', textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'Arial', fontSize: 12)),
+                                    : Text(
+                                        '${line.pieces}',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontFamily: 'Arial',
+                                          fontSize: 12,
+                                        ),
+                                      ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -6846,21 +7377,45 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
                                         height: 36,
                                         child: TextField(
                                           controller: _priceControllers[index],
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(
+                                                decimal: true,
+                                              ),
                                           textAlign: TextAlign.right,
-                                          style: const TextStyle(fontSize: 12, fontFamily: 'Arial'),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontFamily: 'Arial',
+                                          ),
                                           decoration: const InputDecoration(
                                             border: OutlineInputBorder(),
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 6),
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                ),
                                           ),
                                         ),
                                       )
-                                    : Text(_money(line.price), textAlign: TextAlign.right, style: const TextStyle(fontFamily: 'Arial', fontSize: 12)),
+                                    : Text(
+                                        _money(line.price),
+                                        textAlign: TextAlign.right,
+                                        style: const TextStyle(
+                                          fontFamily: 'Arial',
+                                          fontSize: 12,
+                                        ),
+                                      ),
                               ),
                               const SizedBox(width: 8),
                               SizedBox(
                                 width: 70,
-                                child: Text(_money(line.total), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Arial', fontSize: 13)),
+                                child: Text(
+                                  _money(line.total),
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Arial',
+                                    fontSize: 13,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -6879,13 +7434,16 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
                           widget.onDelete!();
                           Navigator.pop(context);
                         },
-                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
                         icon: const Icon(Icons.delete_outline, size: 18),
                         label: const Text('Delete Bill'),
                       ),
                     Row(
                       children: [
-                        if (widget.onRecordPayment != null && widget.bill.balance > 0) ...[
+                        if (widget.onRecordPayment != null &&
+                            widget.bill.balance > 0) ...[
                           OutlinedButton.icon(
                             onPressed: widget.onRecordPayment,
                             icon: const Icon(Icons.add_card_outlined, size: 17),
@@ -6967,7 +7525,14 @@ class _BillCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(bill.id, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, fontFamily: 'Arial')),
+                      Text(
+                        bill.id,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Arial',
+                        ),
+                      ),
                       const SizedBox(height: 5),
                       Text(
                         '${bill.customer}  ·  ${bill.customerId}  ·  ${_date(bill.createdAt)}',
@@ -7006,11 +7571,23 @@ class _BillCard extends StatelessWidget {
               children: [
                 Text(
                   '${bill.lines.length} line items  •  Balance due: ${_money(bill.balance)}',
-                  style: const TextStyle(fontFamily: 'Arial', fontSize: 12, color: _muted),
+                  style: const TextStyle(
+                    fontFamily: 'Arial',
+                    fontSize: 12,
+                    color: _muted,
+                  ),
                 ),
                 Row(
                   children: const [
-                    Text('Edit / View Bill', style: TextStyle(fontFamily: 'Arial', fontSize: 12, color: _gold, fontWeight: FontWeight.w600)),
+                    Text(
+                      'Edit / View Bill',
+                      style: TextStyle(
+                        fontFamily: 'Arial',
+                        fontSize: 12,
+                        color: _gold,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     SizedBox(width: 4),
                     Icon(Icons.arrow_forward_ios, size: 11, color: _gold),
                   ],
@@ -7227,6 +7804,8 @@ class OrdersPage extends StatelessWidget {
     required this.onMarkSeen,
     required this.onAddPending,
     required this.onRefreshPending,
+    required this.onDeletePending,
+    required this.onOpenProduct,
     required this.onDownload,
     required this.onDeleteOrder,
   });
@@ -7240,6 +7819,8 @@ class OrdersPage extends StatelessWidget {
   final ValueChanged<CustomerOrder> onMarkSeen;
   final ValueChanged<PendingRequest> onAddPending;
   final ValueChanged<Product> onRefreshPending;
+  final ValueChanged<PendingRequest> onDeletePending;
+  final ValueChanged<Product> onOpenProduct;
   final ValueChanged<Bill> onDownload;
   final ValueChanged<CustomerOrder> onDeleteOrder;
 
@@ -7252,13 +7833,17 @@ class OrdersPage extends StatelessWidget {
         : orders;
     final visibleRequests = _isCustomer
         ? pendingRequests
-        .where((request) => request.customerId == account.id)
-        .toList()
+              .where(
+                (request) =>
+                    request.customerId == account.id &&
+                    request.status != PendingStatus.fulfilled,
+              )
+              .toList()
         : pendingRequests;
     final pendingByCustomer = <String, List<PendingRequest>>{};
     if (!_isCustomer) {
       for (final request in visibleRequests.where(
-            (request) => request.status != PendingStatus.fulfilled,
+        (request) => request.status != PendingStatus.fulfilled,
       )) {
         pendingByCustomer
             .putIfAbsent(request.customerId, () => [])
@@ -7341,7 +7926,7 @@ class OrdersPage extends StatelessWidget {
               if (visibleRequests.isNotEmpty)
                 _Badge(
                   text:
-                  '${visibleRequests.where((request) => request.status != PendingStatus.fulfilled).length} OPEN',
+                      '${visibleRequests.where((request) => request.status != PendingStatus.fulfilled).length} OPEN',
                 ),
             ],
           ),
@@ -7351,75 +7936,82 @@ class OrdersPage extends StatelessWidget {
               icon: Icons.hourglass_empty,
               title: 'No pending items',
               text:
-              'Unavailable items requested by customers will appear here.',
+                  'Unavailable items requested by customers will appear here.',
             )
           else if (_isCustomer)
             ...visibleRequests.map(
-                  (request) => _PendingRequestCard(
+              (request) => _PendingRequestCard(
                 request: request,
                 product: _findProduct(request.productId),
                 canAdd: request.status == PendingStatus.ready,
                 onAdd: () => onAddPending(request),
                 onRefresh: () => _refreshFor(request),
+                onDelete: () => onDeletePending(request),
+                onOpenProduct: () =>
+                    onOpenProduct(_findProduct(request.productId)!),
               ),
             )
           else if (pendingByCustomer.isEmpty)
-              const _EmptyState(
-                icon: Icons.hourglass_empty,
-                title: 'No pending items',
-                text: 'There are no open stock requests from customers.',
-              )
-            else
-              ...pendingByCustomer.entries.map((entry) {
-                final requests = entry.value
-                  ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-                final customer = requests.first;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: _line),
-                  ),
-                  child: Theme(
-                    data: Theme.of(context)
-                        .copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Color(0xFFF1EBDD),
-                        foregroundColor: _gold,
-                        child: Icon(Icons.person_outline),
-                      ),
-                      title: Text(
-                        customer.customerName,
-                        style: const TextStyle(fontSize: 15),
-                      ),
-                      subtitle: Text(
-                        '${customer.customerId} · ${requests.length} pending ${requests.length == 1 ? 'item' : 'items'}',
-                        style: const TextStyle(
-                          fontFamily: 'Arial',
-                          color: _muted,
-                          fontSize: 11,
-                        ),
-                      ),
-                      children: requests
-                          .map(
-                            (request) => Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                          child: _PendingRequestCard(
-                            request: request,
-                            product: _findProduct(request.productId),
-                            canAdd: false,
-                            onAdd: () {},
-                            onRefresh: () => _refreshFor(request),
-                          ),
-                        ),
-                      )
-                          .toList(),
+            const _EmptyState(
+              icon: Icons.hourglass_empty,
+              title: 'No pending items',
+              text: 'There are no open stock requests from customers.',
+            )
+          else
+            ...pendingByCustomer.entries.map((entry) {
+              final requests = entry.value
+                ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+              final customer = requests.first;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: _line),
+                ),
+                child: Theme(
+                  data: Theme.of(context)
+                      .copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFFF1EBDD),
+                      foregroundColor: _gold,
+                      child: Icon(Icons.person_outline),
                     ),
+                    title: Text(
+                      customer.customerName,
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                    subtitle: Text(
+                      '${customer.customerId} · ${requests.length} pending ${requests.length == 1 ? 'item' : 'items'}',
+                      style: const TextStyle(
+                        fontFamily: 'Arial',
+                        color: _muted,
+                        fontSize: 11,
+                      ),
+                    ),
+                    children: requests
+                        .map(
+                          (request) => Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                            child: _PendingRequestCard(
+                              request: request,
+                              product: _findProduct(request.productId),
+                              canAdd: false,
+                              onAdd: () {},
+                              onRefresh: () => _refreshFor(request),
+                              onDelete: () => onDeletePending(request),
+                              onOpenProduct: () => onOpenProduct(
+                                _findProduct(request.productId)!,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
-                );
-              }),
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -7452,12 +8044,18 @@ class PendingItemsPage extends StatelessWidget {
     required this.products,
     required this.onAdd,
     required this.onRefresh,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onOpenProduct,
   });
 
   final List<PendingRequest> requests;
   final List<Product> products;
   final ValueChanged<PendingRequest> onAdd;
   final ValueChanged<Product> onRefresh;
+  final ValueChanged<PendingRequest> onEdit;
+  final ValueChanged<PendingRequest> onDelete;
+  final ValueChanged<Product> onOpenProduct;
 
   @override
   Widget build(BuildContext context) => _PageFrame(
@@ -7466,28 +8064,33 @@ class PendingItemsPage extends StatelessWidget {
     description: 'Items you asked us to reserve when stock becomes available.',
     child: requests.isEmpty
         ? const _EmptyState(
-      icon: Icons.hourglass_empty,
-      title: 'No pending items',
-      text: 'Use “Request when available” on an out-of-stock item to save it here.',
-    )
+            icon: Icons.hourglass_empty,
+            title: 'No pending items',
+            text: 'Use “Request when available” on an out-of-stock item to save it here.',
+          )
         : Column(
-      children: requests.map((request) {
-        Product? product;
-        for (final candidate in products) {
-          if (candidate.id == request.productId) {
-            product = candidate;
-            break;
-          }
-        }
-        return _PendingRequestCard(
-          request: request,
-          product: product,
-          canAdd: request.status == PendingStatus.ready,
-          onAdd: () => onAdd(request),
-          onRefresh: product == null ? () {} : () => onRefresh(product!),
-        );
-      }).toList(),
-    ),
+            children: requests.map((request) {
+              Product? product;
+              for (final candidate in products) {
+                if (candidate.id == request.productId) {
+                  product = candidate;
+                  break;
+                }
+              }
+              return _PendingRequestCard(
+                request: request,
+                product: product,
+                canAdd: request.status == PendingStatus.ready,
+                onAdd: () => onAdd(request),
+                onRefresh: product == null ? () {} : () => onRefresh(product!),
+                onEdit: () => onEdit(request),
+                onDelete: () => onDelete(request),
+                onOpenProduct: product == null
+                    ? null
+                    : () => onOpenProduct(product!),
+              );
+            }).toList(),
+          ),
   );
 }
 
@@ -7525,7 +8128,14 @@ class _OrderDetailsPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text('Order ${order.id}', style: const TextStyle(fontFamily: 'Arial', fontSize: 16, color: Colors.black87)),
+        title: Text(
+          'Order ${order.id}',
+          style: const TextStyle(
+            fontFamily: 'Arial',
+            fontSize: 16,
+            color: Colors.black87,
+          ),
+        ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.black87),
       ),
@@ -7551,25 +8161,76 @@ class _OrderDetailsPage extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Order ${order.id}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Arial')),
+                          Text(
+                            'Order ${order.id}',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Arial',
+                            ),
+                          ),
                           if (bill != null)
                             _Badge(
-                              text: bill!.paymentMode == PaymentMode.credit && bill!.balance > 0 ? 'CREDIT DUE' : 'PAID',
+                              text:
+                                  bill!.paymentMode == PaymentMode.credit &&
+                                      bill!.balance > 0
+                                  ? 'CREDIT DUE'
+                                  : 'PAID',
                               muted: bill!.balance > 0,
                             ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text('Customer: ${order.customerName} (${order.customerId})', style: const TextStyle(color: _muted, fontFamily: 'Arial', fontSize: 13)),
-                      if (order.placedByName.isNotEmpty && order.placedByName != order.customerName)
-                        Text('Placed by: ${order.placedByName}', style: const TextStyle(color: _muted, fontFamily: 'Arial', fontSize: 12)),
-                      Text('Placed on: ${_date(order.createdAt)}', style: const TextStyle(color: _muted, fontFamily: 'Arial', fontSize: 12)),
+                      Text(
+                        'Customer: ${order.customerName} (${order.customerId})',
+                        style: const TextStyle(
+                          color: _muted,
+                          fontFamily: 'Arial',
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (order.placedByName.isNotEmpty &&
+                          order.placedByName != order.customerName)
+                        Text(
+                          'Placed by: ${order.placedByName}',
+                          style: const TextStyle(
+                            color: _muted,
+                            fontFamily: 'Arial',
+                            fontSize: 12,
+                          ),
+                        ),
+                      Text(
+                        'Placed on: ${_date(order.createdAt)}',
+                        style: const TextStyle(
+                          color: _muted,
+                          fontFamily: 'Arial',
+                          fontSize: 12,
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Status: ${order.status.label}', style: TextStyle(fontFamily: 'Arial', fontWeight: FontWeight.bold, fontSize: 15, color: order.status == OrderStatus.completed ? Colors.green : _gold)),
-                          Text(_money(totalAmount), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _gold, fontFamily: 'Arial')),
+                          Text(
+                            'Status: ${order.status.label}',
+                            style: TextStyle(
+                              fontFamily: 'Arial',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: order.status == OrderStatus.completed
+                                  ? Colors.green
+                                  : _gold,
+                            ),
+                          ),
+                          Text(
+                            _money(totalAmount),
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: _gold,
+                              fontFamily: 'Arial',
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -7588,7 +8249,14 @@ class _OrderDetailsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Ordered Items ($totalPieces pieces)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Arial')),
+                      Text(
+                        'Ordered Items ($totalPieces pieces)',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Arial',
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       ...order.lines.map((line) {
                         Product? matchedProduct;
@@ -7599,25 +8267,29 @@ class _OrderDetailsPage extends StatelessWidget {
                           }
                         }
                         return InkWell(
-                          onTap: matchedProduct == null ? null : () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => _ProductDetailsPage(
-                                product: matchedProduct!,
-                                allowCart: false,
-                                availablePieces: matchedProduct.stock,
-                                onAdd: (_) {},
-                                onRequestPending: () {},
-                              ),
-                            ),
-                          ),
+                          onTap: matchedProduct == null
+                              ? null
+                              : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => _ProductDetailsPage(
+                                      product: matchedProduct!,
+                                      allowCart: false,
+                                      availablePieces: matchedProduct.stock,
+                                      showStock: !isCustomer,
+                                      onAdd: (_) {},
+                                      onRequestPending: () {},
+                                    ),
+                                  ),
+                                ),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Row(
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         line.name,
@@ -7625,17 +8297,42 @@ class _OrderDetailsPage extends StatelessWidget {
                                           fontSize: 14,
                                           fontFamily: 'Arial',
                                           fontWeight: FontWeight.w600,
-                                          color: matchedProduct != null ? _gold : Colors.black87,
-                                          decoration: matchedProduct != null ? TextDecoration.underline : null,
+                                          color: matchedProduct != null
+                                              ? _gold
+                                              : Colors.black87,
+                                          decoration: matchedProduct != null
+                                              ? TextDecoration.underline
+                                              : null,
                                         ),
                                       ),
-                                      Text('${line.productId} · Quality: ${line.quality}', style: const TextStyle(color: _muted, fontSize: 11, fontFamily: 'Arial')),
+                                      Text(
+                                        '${line.productId} · Quality: ${line.quality}',
+                                        style: const TextStyle(
+                                          color: _muted,
+                                          fontSize: 11,
+                                          fontFamily: 'Arial',
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
-                                Text('${line.pieces} pcs × ${_money(line.price)}', style: const TextStyle(fontSize: 12, color: _muted, fontFamily: 'Arial')),
+                                Text(
+                                  '${line.pieces} pcs × ${_money(line.price)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: _muted,
+                                    fontFamily: 'Arial',
+                                  ),
+                                ),
                                 const SizedBox(width: 12),
-                                Text(_money(line.total), style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Arial', fontSize: 14)),
+                                Text(
+                                  _money(line.total),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Arial',
+                                    fontSize: 14,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -7645,8 +8342,22 @@ class _OrderDetailsPage extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Total Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, fontFamily: 'Arial')),
-                          Text(_money(totalAmount), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Arial')),
+                          const Text(
+                            'Total Amount',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              fontFamily: 'Arial',
+                            ),
+                          ),
+                          Text(
+                            _money(totalAmount),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              fontFamily: 'Arial',
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -7665,7 +8376,13 @@ class _OrderDetailsPage extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        const Text('Change Status:', style: TextStyle(fontFamily: 'Arial', fontWeight: FontWeight.bold)),
+                        const Text(
+                          'Change Status:',
+                          style: TextStyle(
+                            fontFamily: 'Arial',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(width: 12),
                         DropdownButton<OrderStatus>(
                           value: order.status,
@@ -7674,7 +8391,13 @@ class _OrderDetailsPage extends StatelessWidget {
                               .map(
                                 (status) => DropdownMenuItem(
                                   value: status,
-                                  child: Text(status.label, style: const TextStyle(fontFamily: 'Arial', fontSize: 13)),
+                                  child: Text(
+                                    status.label,
+                                    style: const TextStyle(
+                                      fontFamily: 'Arial',
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -7688,7 +8411,9 @@ class _OrderDetailsPage extends StatelessWidget {
                             onDeleteOrder();
                             Navigator.pop(context);
                           },
-                          style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
                           icon: const Icon(Icons.delete_outline, size: 18),
                           label: const Text('Delete Order'),
                         ),
@@ -7784,7 +8509,13 @@ class _OrderCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(order.id, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                            Text(
+                              order.id,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             if (!isCustomer && !order.seenByStaff) ...[
                               const SizedBox(width: 8),
                               const _Badge(text: 'NEW'),
@@ -7815,10 +8546,25 @@ class _OrderCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('$totalPieces items  •  ${_money(totalAmount)}', style: const TextStyle(fontFamily: 'Arial', fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(
+                    '$totalPieces items  •  ${_money(totalAmount)}',
+                    style: const TextStyle(
+                      fontFamily: 'Arial',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   Row(
                     children: const [
-                      Text('View Order Details', style: TextStyle(fontFamily: 'Arial', fontSize: 12, color: _gold, fontWeight: FontWeight.w600)),
+                      Text(
+                        'View Order Details',
+                        style: TextStyle(
+                          fontFamily: 'Arial',
+                          fontSize: 12,
+                          color: _gold,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       SizedBox(width: 4),
                       Icon(Icons.arrow_forward_ios, size: 11, color: _gold),
                     ],
@@ -7840,12 +8586,18 @@ class _PendingRequestCard extends StatelessWidget {
     required this.canAdd,
     required this.onAdd,
     required this.onRefresh,
+    this.onOpenProduct,
+    this.onEdit,
+    this.onDelete,
   });
   final PendingRequest request;
   final Product? product;
   final bool canAdd;
   final VoidCallback onAdd;
   final VoidCallback onRefresh;
+  final VoidCallback? onOpenProduct;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -7865,27 +8617,15 @@ class _PendingRequestCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               InkWell(
-                onTap: product == null
-                    ? null
-                    : () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => _ProductDetailsPage(
-                              product: product!,
-                              allowCart: false,
-                              availablePieces: product!.stock,
-                              onAdd: (_) {},
-                              onRequestPending: () {},
-                            ),
-                          ),
-                        ),
+                onTap: product == null ? null : onOpenProduct,
                 child: Text(
                   request.productName,
                   style: TextStyle(
                     fontSize: 13,
                     color: product != null ? _gold : Colors.black87,
-                    decoration:
-                        product != null ? TextDecoration.underline : null,
+                    decoration: product != null
+                        ? TextDecoration.underline
+                        : null,
                   ),
                 ),
               ),
@@ -7923,8 +8663,75 @@ class _PendingRequestCard extends StatelessWidget {
             onPressed: onRefresh,
             icon: const Icon(Icons.refresh, color: _muted),
           ),
+        if (onEdit != null || onDelete != null)
+          PopupMenuButton<String>(
+            tooltip: 'Pending item actions',
+            onSelected: (action) {
+              if (action == 'edit') onEdit?.call();
+              if (action == 'delete') onDelete?.call();
+            },
+            itemBuilder: (_) => [
+              if (onEdit != null && request.status == PendingStatus.pending)
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Text('Edit quantity'),
+                ),
+              if (onDelete != null)
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Remove pending item'),
+                ),
+            ],
+          ),
       ],
     ),
+  );
+}
+
+class _EditPendingPiecesDialog extends StatefulWidget {
+  const _EditPendingPiecesDialog({required this.request});
+
+  final PendingRequest request;
+
+  @override
+  State<_EditPendingPiecesDialog> createState() =>
+      _EditPendingPiecesDialogState();
+}
+
+class _EditPendingPiecesDialogState extends State<_EditPendingPiecesDialog> {
+  late final TextEditingController _pieces = TextEditingController(
+    text: '${widget.request.pieces}',
+  );
+
+  @override
+  void dispose() {
+    _pieces.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Edit pending quantity'),
+    content: TextField(
+      controller: _pieces,
+      autofocus: true,
+      keyboardType: TextInputType.number,
+      decoration: const InputDecoration(labelText: 'Pieces'),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: () {
+          final pieces = int.tryParse(_pieces.text.trim());
+          if (pieces == null || pieces <= 0) return;
+          Navigator.pop(context, pieces);
+        },
+        child: const Text('Save'),
+      ),
+    ],
   );
 }
 
@@ -8032,7 +8839,7 @@ class TeamPage extends StatelessWidget {
               )
             else
               ...applications.map(
-                    (application) => _AccountApplicationCard(
+                (application) => _AccountApplicationCard(
                   application: application,
                   onApprove: () => onApprove(application),
                   onReject: () => onReject(application),
@@ -8043,7 +8850,7 @@ class TeamPage extends StatelessWidget {
             const SizedBox(height: 12),
           ],
           ...accounts.map(
-                (account) => _AccountCard(
+            (account) => _AccountCard(
               account: account,
               onEdit: currentAccount.isAdmin && account.id != currentAccount.id
                   ? () => _editPermissions(context, account)
@@ -8104,109 +8911,109 @@ class CustomersPage extends StatelessWidget {
     description: 'Open a customer account to review orders, bills, payments, and balance due.',
     child: customers.isEmpty
         ? const _EmptyState(
-      icon: Icons.people_outline,
-      title: 'No customer accounts',
-      text: 'An administrator can create customer accounts in People & permissions.',
-    )
+            icon: Icons.people_outline,
+            title: 'No customer accounts',
+            text: 'An administrator can create customer accounts in People & permissions.',
+          )
         : Column(
-      children: customers.map((customer) {
-        final customerBills = bills
-            .where((bill) => bill.customerId == customer.id)
-            .toList();
-        final balance = customerBills.fold<double>(
-          0,
-              (sum, bill) => sum + bill.balance,
-        );
-        final orderCount = orders
-            .where((order) => order.customerId == customer.id)
-            .length;
-        final pendingCount = pendingRequests
-            .where(
-              (request) =>
-          request.customerId == customer.id &&
-              request.status != PendingStatus.fulfilled,
-        )
-            .length;
-        return InkWell(
-          onTap: () => _openCustomer(context, customer),
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(15),
-            margin: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _line),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: const Color(0xFFF1EBDD),
-                  foregroundColor: _gold,
-                  child: Text(
-                    customer.name.isEmpty
-                        ? '?'
-                        : customer.name[0].toUpperCase(),
+            children: customers.map((customer) {
+              final customerBills = bills
+                  .where((bill) => bill.customerId == customer.id)
+                  .toList();
+              final balance = customerBills.fold<double>(
+                0,
+                (sum, bill) => sum + bill.balance,
+              );
+              final orderCount = orders
+                  .where((order) => order.customerId == customer.id)
+                  .length;
+              final pendingCount = pendingRequests
+                  .where(
+                    (request) =>
+                        request.customerId == customer.id &&
+                        request.status != PendingStatus.fulfilled,
+                  )
+                  .length;
+              return InkWell(
+                onTap: () => _openCustomer(context, customer),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(15),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _line),
                   ),
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        customer.name,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${customer.id} · ${customer.login}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Arial',
-                          color: _muted,
-                          fontSize: 11,
+                      CircleAvatar(
+                        backgroundColor: const Color(0xFFF1EBDD),
+                        foregroundColor: _gold,
+                        child: Text(
+                          customer.name.isEmpty
+                              ? '?'
+                              : customer.name[0].toUpperCase(),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '$orderCount orders · ${customerBills.length} bills · $pendingCount pending items',
-                        style: const TextStyle(
-                          fontFamily: 'Arial',
-                          color: _muted,
-                          fontSize: 10,
+                      const SizedBox(width: 13),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              customer.name,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${customer.id} · ${customer.login}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Arial',
+                                color: _muted,
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '$orderCount orders · ${customerBills.length} bills · $pendingCount pending items',
+                              style: const TextStyle(
+                                fontFamily: 'Arial',
+                                color: _muted,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('BALANCE DUE', style: _tableHeader),
+                          const SizedBox(height: 4),
+                          Text(
+                            _money(balance),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: balance > 0
+                                  ? const Color(0xFF9B4F3F)
+                                  : _ink,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 7),
+                      const Icon(Icons.chevron_right, color: _muted),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('BALANCE DUE', style: _tableHeader),
-                    const SizedBox(height: 4),
-                    Text(
-                      _money(balance),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: balance > 0
-                            ? const Color(0xFF9B4F3F)
-                            : _ink,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 7),
-                const Icon(Icons.chevron_right, color: _muted),
-              ],
-            ),
+              );
+            }).toList(),
           ),
-        );
-      }).toList(),
-    ),
   );
 
   Future<void> _openCustomer(BuildContext context, Account customer) async {
@@ -8318,7 +9125,7 @@ class _CustomerDetailDialogState extends State<_CustomerDetailDialog> {
                     const Text('Orders', style: TextStyle(fontSize: 18)),
                     const SizedBox(height: 9),
                     ...widget.orders.map(
-                          (order) => _OrderCard(
+                      (order) => _OrderCard(
                         order: order,
                         isCustomer: true,
                         bill: _findBill(order.billId),
@@ -8338,7 +9145,7 @@ class _CustomerDetailDialogState extends State<_CustomerDetailDialog> {
                     const Text('Pending items', style: TextStyle(fontSize: 18)),
                     const SizedBox(height: 9),
                     ...widget.pendingRequests.map(
-                          (request) => _PendingRequestCard(
+                      (request) => _PendingRequestCard(
                         request: request,
                         product: null,
                         canAdd: false,
@@ -8361,7 +9168,7 @@ class _CustomerDetailDialogState extends State<_CustomerDetailDialog> {
                     )
                   else
                     ...widget.bills.map(
-                          (bill) => _BillCard(
+                      (bill) => _BillCard(
                         bill: bill,
                         onDownload: widget.onDownload,
                         onRecordPayment: bill.balance <= 0
@@ -8534,7 +9341,7 @@ class StatisticsPage extends StatelessWidget {
         .toList();
     final salesToday = todayBills.fold<double>(
       0,
-          (sum, bill) => sum + bill.total,
+      (sum, bill) => sum + bill.total,
     );
     final cashToday = bills
         .expand((bill) => bill.payments)
@@ -8545,25 +9352,25 @@ class StatisticsPage extends StatelessWidget {
         .fold<double>(0, (sum, bill) => sum + bill.total);
     final outstanding = bills.fold<double>(
       0,
-          (sum, bill) => sum + bill.balance,
+      (sum, bill) => sum + bill.balance,
     );
     final openRequests = pendingRequests
         .where((request) => request.status != PendingStatus.fulfilled)
         .length;
     final days = List.generate(
       7,
-          (index) => DateTime(today.year, today.month, today.day - 6 + index),
+      (index) => DateTime(today.year, today.month, today.day - 6 + index),
     );
     final sales = days
         .map(
           (day) => bills
-          .where((bill) => _sameDay(bill.createdAt, day))
-          .fold<double>(0, (sum, bill) => sum + bill.total),
-    )
+              .where((bill) => _sameDay(bill.createdAt, day))
+              .fold<double>(0, (sum, bill) => sum + bill.total),
+        )
         .toList();
     final maximum = sales.fold<double>(
       0,
-          (value, sale) => sale > value ? sale : value,
+      (value, sale) => sale > value ? sale : value,
     );
     return _PageFrame(
       eyebrow: 'BUSINESS OVERVIEW',
@@ -8610,7 +9417,7 @@ class StatisticsPage extends StatelessWidget {
                     width: itemWidth,
                     label: 'ORDERS TODAY',
                     value:
-                    '${orders.where((order) => _sameDay(order.createdAt, today)).length}',
+                        '${orders.where((order) => _sameDay(order.createdAt, today)).length}',
                     icon: Icons.receipt_long_outlined,
                   ),
                   _StatCard(
@@ -8657,8 +9464,8 @@ class StatisticsPage extends StatelessWidget {
                       final height = maximum == 0
                           ? 3.0
                           : (sales[index] / maximum * 105)
-                          .clamp(3.0, 105.0)
-                          .toDouble();
+                                .clamp(3.0, 105.0)
+                                .toDouble();
                       return Expanded(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 5),
@@ -8760,9 +9567,11 @@ class BusinessSettingsPage extends StatefulWidget {
   const BusinessSettingsPage({
     super.key,
     required this.business,
+    required this.onOpenAccount,
     required this.onChanged,
   });
   final BusinessProfile business;
+  final VoidCallback onOpenAccount;
   final VoidCallback onChanged;
   @override
   State<BusinessSettingsPage> createState() => _BusinessSettingsPageState();
@@ -8784,9 +9593,10 @@ class _BusinessSettingsPageState extends State<BusinessSettingsPage> {
 
   @override
   Widget build(BuildContext context) => _PageFrame(
-    eyebrow: 'STORE SETTINGS',
-    title: 'Business profile',
-    description: 'These details appear on customer receipts.',
+    eyebrow: 'SETTINGS',
+    title: 'Settings',
+    description:
+        'Manage the store profile, workspace features, and your account.',
     child: Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -8822,11 +9632,60 @@ class _BusinessSettingsPageState extends State<BusinessSettingsPage> {
                 labelText: 'Business phone (optional)',
               ),
             ),
+            const SizedBox(height: 22),
+            const Text(
+              'Store features',
+              style: TextStyle(
+                fontFamily: 'Arial',
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Choose which areas are available in the workspace navigation.',
+              style: TextStyle(
+                fontFamily: 'Arial',
+                color: _muted,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Stock management'),
+              subtitle: const Text('Show inventory and stock controls.'),
+              value: widget.business.enableInventory,
+              onChanged: (value) =>
+                  setState(() => widget.business.enableInventory = value),
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Production'),
+              subtitle: const Text('Show production tasks and assignments.'),
+              value: widget.business.enableProduction,
+              onChanged: (value) =>
+                  setState(() => widget.business.enableProduction = value),
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Chat & support'),
+              subtitle: const Text('Show store chat in the workspace.'),
+              value: widget.business.enableChat,
+              onChanged: (value) =>
+                  setState(() => widget.business.enableChat = value),
+            ),
             const SizedBox(height: 18),
             FilledButton.icon(
               onPressed: _save,
               icon: const Icon(Icons.save_outlined),
               label: const Text('Save business profile'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: widget.onOpenAccount,
+              icon: const Icon(Icons.manage_accounts_outlined),
+              label: const Text('Account settings'),
             ),
           ],
         ),
@@ -8903,8 +9762,14 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                 backgroundColor: const Color(0xFFF1EBDD),
                 foregroundColor: _gold,
                 child: Text(
-                  widget.account.name.isEmpty ? '?' : widget.account.name[0].toUpperCase(),
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'Arial'),
+                  widget.account.name.isEmpty
+                      ? '?'
+                      : widget.account.name[0].toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Arial',
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -8913,13 +9778,23 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.account.name.isEmpty ? 'Account User' : widget.account.name,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Arial'),
+                      widget.account.name.isEmpty
+                          ? 'Account User'
+                          : widget.account.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Arial',
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Account ID: ${widget.account.id}',
-                      style: const TextStyle(color: _muted, fontSize: 12, fontFamily: 'Arial'),
+                      style: const TextStyle(
+                        color: _muted,
+                        fontSize: 12,
+                        fontFamily: 'Arial',
+                      ),
                     ),
                   ],
                 ),
@@ -8943,20 +9818,31 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               children: [
                 TextFormField(
                   controller: _name,
-                  decoration: const InputDecoration(labelText: 'Full name', prefixIcon: Icon(Icons.person_outline)),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Enter your name' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Full name',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter your name'
+                      : null,
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _email,
                   readOnly: widget.firebaseEnabled,
-                  decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
+                  decoration: const InputDecoration(
+                    labelText: 'Email address',
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _phone,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Phone number', prefixIcon: Icon(Icons.phone_outlined)),
+                  decoration: const InputDecoration(
+                    labelText: 'Phone number',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
                 ),
                 if (!widget.firebaseEnabled) ...[
                   const SizedBox(height: 14),
@@ -8993,8 +9879,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       if (_password.text.isNotEmpty) widget.account.password = _password.text;
     }
     widget.onChanged();
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Profile updated successfully.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profile updated successfully.')),
+    );
   }
 }
 
@@ -9204,7 +10091,9 @@ class _ChatPageState extends State<ChatPage> {
     FirebaseAppService.sendChatMessage(
       chatRoomId: _selectedRoomId,
       senderUid: widget.account.uid ?? widget.account.id,
-      senderName: widget.account.name.isEmpty ? 'Customer' : widget.account.name,
+      senderName: widget.account.name.isEmpty
+          ? 'Customer'
+          : widget.account.name,
       text: text.isEmpty ? 'Product Inquiry' : text,
       productId: _attachedProduct?.id,
       productName: _attachedProduct?.name,
@@ -9227,7 +10116,8 @@ class _ChatPageState extends State<ChatPage> {
     return _PageFrame(
       eyebrow: 'MESSAGING',
       title: 'Store Chat & Support',
-      description: 'Direct communication between customers and store administrators.',
+      description:
+          'Direct communication between customers and store administrators.',
       child: Container(
         height: 600,
         decoration: BoxDecoration(
@@ -9248,7 +10138,13 @@ class _ChatPageState extends State<ChatPage> {
                   children: [
                     const Padding(
                       padding: EdgeInsets.all(12),
-                      child: Text('Customer Conversations', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Arial')),
+                      child: Text(
+                        'Customer Conversations',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Arial',
+                        ),
+                      ),
                     ),
                     const Divider(color: _line, height: 1),
                     Expanded(
@@ -9261,9 +10157,22 @@ class _ChatPageState extends State<ChatPage> {
                           return ListTile(
                             selected: isSelected,
                             selectedTileColor: const Color(0xFFF1EBDD),
-                            title: Text(c.name.isEmpty ? 'Customer' : c.name, style: const TextStyle(fontSize: 13, fontFamily: 'Arial')),
-                            subtitle: Text(c.id, style: const TextStyle(fontSize: 10, color: _muted)),
-                            onTap: () => setState(() => _selectedRoomId = roomId),
+                            title: Text(
+                              c.name.isEmpty ? 'Customer' : c.name,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontFamily: 'Arial',
+                              ),
+                            ),
+                            subtitle: Text(
+                              c.id,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: _muted,
+                              ),
+                            ),
+                            onTap: () =>
+                                setState(() => _selectedRoomId = roomId),
                           );
                         },
                       ),
@@ -9277,17 +10186,25 @@ class _ChatPageState extends State<ChatPage> {
                 children: [
                   Expanded(
                     child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseAppService.chatMessagesStream(_selectedRoomId),
+                      stream: FirebaseAppService.chatMessagesStream(
+                        _selectedRoomId,
+                      ),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator(color: _gold));
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(color: _gold),
+                          );
                         }
                         final docs = snapshot.data?.docs ?? [];
                         if (docs.isEmpty) {
                           return const Center(
                             child: Text(
                               'No messages yet. Ask a question or inquire about a product!',
-                              style: TextStyle(color: _muted, fontFamily: 'Arial'),
+                              style: TextStyle(
+                                color: _muted,
+                                fontFamily: 'Arial',
+                              ),
                             ),
                           );
                         }
@@ -9297,21 +10214,31 @@ class _ChatPageState extends State<ChatPage> {
                           itemCount: docs.length,
                           itemBuilder: (context, index) {
                             final data = docs[index].data();
-                            final senderName = data['senderName'] as String? ?? 'User';
-                            final senderUid = data['senderUid'] as String? ?? '';
-                            final isMe = senderUid == (widget.account.uid ?? widget.account.id);
+                            final senderName =
+                                data['senderName'] as String? ?? 'User';
+                            final senderUid =
+                                data['senderUid'] as String? ?? '';
+                            final isMe =
+                                senderUid ==
+                                (widget.account.uid ?? widget.account.id);
                             final text = data['text'] as String? ?? '';
                             final pName = data['productName'] as String?;
                             final pImg = data['productImageUrl'] as String?;
 
                             return Align(
-                              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                              alignment: isMe
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 10),
                                 padding: const EdgeInsets.all(12),
-                                constraints: const BoxConstraints(maxWidth: 320),
+                                constraints: const BoxConstraints(
+                                  maxWidth: 320,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: isMe ? const Color(0xFF262521) : const Color(0xFFF1EBDD),
+                                  color: isMe
+                                      ? const Color(0xFF262521)
+                                      : const Color(0xFFF1EBDD),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Column(
@@ -9331,23 +10258,42 @@ class _ChatPageState extends State<ChatPage> {
                                     if (pName != null) ...[
                                       Container(
                                         padding: const EdgeInsets.all(8),
-                                        margin: const EdgeInsets.only(bottom: 6),
+                                        margin: const EdgeInsets.only(
+                                          bottom: 6,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: Row(
                                           children: [
                                             if (pImg != null && pImg.isNotEmpty)
                                               ClipRRect(
-                                                borderRadius: BorderRadius.circular(6),
-                                                child: Image.network(pImg, width: 36, height: 36, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome, size: 20)),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                child: Image.network(
+                                                  pImg,
+                                                  width: 36,
+                                                  height: 36,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      const Icon(
+                                                        Icons.auto_awesome,
+                                                        size: 20,
+                                                      ),
+                                                ),
                                               ),
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
                                                 pName,
-                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black87,
+                                                ),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -9360,7 +10306,9 @@ class _ChatPageState extends State<ChatPage> {
                                     Text(
                                       text,
                                       style: TextStyle(
-                                        color: isMe ? Colors.white : Colors.black87,
+                                        color: isMe
+                                            ? Colors.white
+                                            : Colors.black87,
                                         fontSize: 13,
                                         fontFamily: 'Arial',
                                       ),
@@ -9386,12 +10334,17 @@ class _ChatPageState extends State<ChatPage> {
                           Expanded(
                             child: Text(
                               'Inquiring about: ${_attachedProduct!.name}',
-                              style: const TextStyle(fontFamily: 'Arial', fontSize: 12, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontFamily: 'Arial',
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           IconButton(
                             icon: const Icon(Icons.close, size: 16),
-                            onPressed: () => setState(() => _attachedProduct = null),
+                            onPressed: () =>
+                                setState(() => _attachedProduct = null),
                           ),
                         ],
                       ),
@@ -9408,7 +10361,9 @@ class _ChatPageState extends State<ChatPage> {
                             decoration: const InputDecoration(
                               hintText: 'Type a message...',
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                             ),
                             onSubmitted: (_) => _sendMessage(),
                           ),
@@ -9495,7 +10450,10 @@ class _EditPermissionsDialogState extends State<_EditPermissionsDialog> {
               delete: true,
             ),
           ),
-          child: const Text('Delete account', style: TextStyle(color: Colors.red)),
+          child: const Text(
+            'Delete account',
+            style: TextStyle(color: Colors.red),
+          ),
         ),
       ],
     ),
@@ -9610,7 +10568,7 @@ class _AccountFormState extends State<_AccountForm> {
                   controller: _name,
                   decoration: const InputDecoration(labelText: 'Full name'),
                   validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Enter a name' : null,
+                      v == null || v.trim().isEmpty ? 'Enter a name' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -9646,20 +10604,20 @@ class _AccountFormState extends State<_AccountForm> {
                   initialValue: _role,
                   decoration: const InputDecoration(labelText: 'Role'),
                   items:
-                  (widget.currentAccount.isOwner
-                      ? const [UserRole.employee]
-                      : UserRole.values.where(
-                        (role) =>
-                    role != UserRole.admin ||
-                        !widget.adminLimitReached,
-                  ))
-                      .map(
-                        (role) => DropdownMenuItem(
-                      value: role,
-                      child: Text(role.label),
-                    ),
-                  )
-                      .toList(),
+                      (widget.currentAccount.isOwner
+                              ? const [UserRole.employee]
+                              : UserRole.values.where(
+                                  (role) =>
+                                      role != UserRole.admin ||
+                                      !widget.adminLimitReached,
+                                ))
+                          .map(
+                            (role) => DropdownMenuItem(
+                              value: role,
+                              child: Text(role.label),
+                            ),
+                          )
+                          .toList(),
                   onChanged: _selectRole,
                 ),
                 const SizedBox(height: 12),
@@ -9901,25 +10859,19 @@ class _EmptyState extends StatelessWidget {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
-    required this.account,
     this.onMenu,
     required this.cartCount,
     required this.orderCount,
     required this.onSearch,
     required this.onCart,
     required this.onOrders,
-    required this.onPageSelect,
-    required this.onLogout,
   });
-  final Account account;
   final VoidCallback? onMenu;
   final int cartCount;
   final int orderCount;
   final ValueChanged<String> onSearch;
   final VoidCallback? onCart;
   final VoidCallback? onOrders;
-  final ValueChanged<_Page> onPageSelect;
-  final VoidCallback onLogout;
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -9939,28 +10891,34 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (width >= 620 && width < 1000) const _BrandLockup(compact: true),
-          const Spacer(),
-          SizedBox(
-            width: width < 380
-                ? 94
-                : width < 430
-                ? 112
-                : width < 500
-                ? 105
-                : width < 620
-                ? 140
-                : width < 760
-                ? 150
-                : 210,
-            height: 41,
-            child: TextField(
-              onChanged: onSearch,
-              decoration: const InputDecoration(
-                hintText: 'Find a piece...',
-                prefixIcon: Icon(Icons.search, size: 19),
-                contentPadding: EdgeInsets.symmetric(vertical: 7),
-                isDense: true,
+          if (onMenu != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                tooltip: 'Open navigation',
+                onPressed: onMenu,
+                icon: const Icon(Icons.menu_outlined),
+              ),
+            ),
+          if (width >= 500) _BrandLockup(compact: width < 760),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: width >= 760 ? 280 : 210),
+                child: SizedBox(
+                  height: 41,
+                  child: TextField(
+                    onChanged: onSearch,
+                    decoration: const InputDecoration(
+                      hintText: 'Find a piece...',
+                      prefixIcon: Icon(Icons.search, size: 19),
+                      contentPadding: EdgeInsets.symmetric(vertical: 7),
+                      isDense: true,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -9984,62 +10942,6 @@ class _TopBar extends StatelessWidget {
               icon: _OrdersIcon(count: orderCount),
             ),
           const SizedBox(width: 10),
-          PopupMenuButton<String>(
-            tooltip: 'Account menu',
-            onSelected: (action) {
-              if (action == 'logout') onLogout();
-              if (action == 'account') onPageSelect(_Page.account);
-              if (action == 'settings' && account.canSeeBusiness) onPageSelect(_Page.settings);
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'account', child: Text('My account')),
-              if (account.canSeeBusiness)
-                const PopupMenuItem(value: 'settings', child: Text('Business settings')),
-              const PopupMenuItem(value: 'logout', child: Text('Sign out')),
-            ],
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 17,
-                  backgroundColor: const Color(0xFFF1EBDD),
-                  foregroundColor: _gold,
-                  child: Text(
-                    account.name.isEmpty ? '?' : account.name[0].toUpperCase(),
-                    style: const TextStyle(
-                      fontFamily: 'Arial',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (width >= 620)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        account.name,
-                        style: const TextStyle(
-                          fontFamily: 'Arial',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        account.role.label,
-                        style: const TextStyle(
-                          fontFamily: 'Arial',
-                          fontSize: 10,
-                          color: _muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                const SizedBox(width: 3),
-                const Icon(Icons.keyboard_arrow_down, size: 17, color: _muted),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -10161,43 +11063,21 @@ class _Sidebar extends StatelessWidget {
               : const EdgeInsets.fromLTRB(24, 27, 20, 34),
           child: const _BrandLockup(light: true),
         ),
-        if (!compact) ...[
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: _Overline('WORKSPACE', light: true),
-          ),
-          const SizedBox(height: 13),
-        ],
         Expanded(
-          child: Column(
-            children: pages
+          child: ListView(
+            padding: EdgeInsets.only(bottom: compact ? 8 : 12),
+            children: _navigationSections
                 .map(
-                  (item) => compact
-                  ? Expanded(
-                child: _NavItem(
-                  page: item,
-                  selected: page == item,
-                  compact: true,
-                  count: item == _Page.cart
-                      ? cartCount
-                      : item == _Page.orders
-                      ? orderCount
-                      : 0,
-                  onTap: () => onSelect(item),
-                ),
-              )
-                  : _NavItem(
-                page: item,
-                selected: page == item,
-                compact: false,
-                count: item == _Page.cart
-                    ? cartCount
-                    : item == _Page.orders
-                    ? orderCount
-                    : 0,
-                onTap: () => onSelect(item),
-              ),
-            )
+                  (section) => _SidebarSection(
+                    title: section.$1,
+                    pages: section.$2,
+                    selectedPage: page,
+                    compact: compact,
+                    cartCount: cartCount,
+                    orderCount: orderCount,
+                    onSelect: onSelect,
+                  ),
+                )
                 .toList(),
           ),
         ),
@@ -10206,7 +11086,9 @@ class _Sidebar extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () => onSelect(_Page.account),
+              onTap: () => onSelect(
+                pages.contains(_Page.settings) ? _Page.settings : _Page.account,
+              ),
               borderRadius: BorderRadius.circular(13),
               child: Container(
                 padding: EdgeInsets.all(compact ? 9 : 13),
@@ -10227,7 +11109,9 @@ class _Sidebar extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            account.name.isEmpty ? 'My Account' : account.name,
+                            account.name.isEmpty
+                                ? 'Settings & account'
+                                : 'Settings · ${account.name}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -10268,6 +11152,89 @@ class _Sidebar extends StatelessWidget {
       ],
     ),
   );
+
+  List<(String, List<_Page>)> get _navigationSections {
+    final available = pages.toSet();
+    final sections = <(String, List<_Page>)>[];
+
+    void add(String title, List<_Page> candidates) {
+      final visible = candidates.where(available.contains).toList();
+      if (visible.isNotEmpty) sections.add((title, visible));
+    }
+
+    add('OVERVIEW', [
+      _Page.customerDashboard,
+      _Page.adminPanel,
+      _Page.workerPanel,
+    ]);
+    add('WORKSPACE', [
+      _Page.shop,
+      _Page.inventory,
+      _Page.production,
+      _Page.cart,
+      _Page.orders,
+      _Page.pending,
+      _Page.bills,
+    ]);
+    add('BUSINESS', [_Page.customers, _Page.statistics, _Page.team]);
+    add('SUPPORT', [_Page.chat]);
+    add('SETTINGS', [_Page.settings]);
+    add('OTHER', [_Page.access]);
+    return sections;
+  }
+}
+
+class _SidebarSection extends StatelessWidget {
+  const _SidebarSection({
+    required this.title,
+    required this.pages,
+    required this.selectedPage,
+    required this.compact,
+    required this.cartCount,
+    required this.orderCount,
+    required this.onSelect,
+  });
+
+  final String title;
+  final List<_Page> pages;
+  final _Page selectedPage;
+  final bool compact;
+  final int cartCount;
+  final int orderCount;
+  final ValueChanged<_Page> onSelect;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: EdgeInsets.fromLTRB(compact ? 16 : 24, 10, 16, 5),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: .42),
+            fontFamily: 'Arial',
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ),
+      ...pages.map(
+        (item) => _NavItem(
+          page: item,
+          selected: selectedPage == item,
+          compact: compact,
+          count: item == _Page.cart
+              ? cartCount
+              : item == _Page.orders
+              ? orderCount
+              : 0,
+          onTap: () => onSelect(item),
+        ),
+      ),
+    ],
+  );
 }
 
 class _NavItem extends StatelessWidget {
@@ -10298,7 +11265,7 @@ class _NavItem extends StatelessWidget {
     _Page.statistics => 'Sales & statistics',
     _Page.team => 'People & access',
     _Page.chat => 'Chat & Support',
-    _Page.settings => 'Business settings',
+    _Page.settings => 'Settings',
     _Page.account => 'My account',
     _Page.access => 'Access needed',
   };
@@ -10535,20 +11502,20 @@ pw.Document _createReceiptPdf(BusinessProfile business, Bill bill) {
               children: ['PRODUCT / ID', 'PIECES', 'PRICE / PIECE', 'TOTAL']
                   .map(
                     (text) => pw.Padding(
-                  padding: const pw.EdgeInsets.all(8),
-                  child: pw.Text(
-                    text,
-                    style: pw.TextStyle(
-                      fontSize: 8,
-                      fontWeight: pw.FontWeight.bold,
+                      padding: const pw.EdgeInsets.all(8),
+                      child: pw.Text(
+                        text,
+                        style: pw.TextStyle(
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              )
+                  )
                   .toList(),
             ),
             ...bill.lines.map(
-                  (line) => pw.TableRow(
+              (line) => pw.TableRow(
                 children: [
                   pw.Padding(
                     padding: const pw.EdgeInsets.all(8),
@@ -10627,7 +11594,7 @@ pw.Document _createReceiptPdf(BusinessProfile business, Bill bill) {
           ),
           pw.SizedBox(height: 7),
           ...bill.payments.map(
-                (payment) => pw.Padding(
+            (payment) => pw.Padding(
               padding: const pw.EdgeInsets.symmetric(vertical: 2),
               child: pw.Row(
                 children: [
@@ -10822,8 +11789,8 @@ String _date(DateTime date) =>
 
 bool _sameDay(DateTime first, DateTime second) =>
     first.year == second.year &&
-        first.month == second.month &&
-        first.day == second.day;
+    first.month == second.month &&
+    first.day == second.day;
 
 String _compactMoney(double value) {
   if (value >= 10000000) return '₹${(value / 10000000).toStringAsFixed(1)}Cr';

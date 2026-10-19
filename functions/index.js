@@ -352,6 +352,7 @@ exports.placeOrder = onCall({ region }, async (request) => {
 
   const callerUid = request.auth.uid;
   const callerRef = storeMemberRef(storeId, callerUid);
+  const businessRef = db.doc(`stores/${storeId}/business/profile`);
   const customerRef = customerUid ? storeMemberRef(storeId, customerUid) : null;
   const manualCustomerRef = manualCustomerDocumentId
     ? db.doc(`stores/${storeId}/customers/${manualCustomerDocumentId}`)
@@ -380,6 +381,7 @@ exports.placeOrder = onCall({ region }, async (request) => {
       profileRefs.push(customerRef);
     }
     const profileSnapshots = await transaction.getAll(...profileRefs);
+    const businessSnapshot = await transaction.get(businessRef);
     const callerSnapshot = profileSnapshots[0];
     const customerSnapshot = manualCustomerRef
       ? null
@@ -398,6 +400,8 @@ exports.placeOrder = onCall({ region }, async (request) => {
       throw new HttpsError("permission-denied", "The store account could not be verified.");
     }
     const caller = callerSnapshot.data();
+    const stockManagementEnabled = !businessSnapshot.exists
+      || businessSnapshot.data().enableInventory !== false;
     const callerRole = String(caller.role ?? "customer").trim().toLowerCase();
     const customer = manualCustomerRef
       ? manualCustomerSnapshot.data()
@@ -431,7 +435,9 @@ exports.placeOrder = onCall({ region }, async (request) => {
       const product = snapshot.data();
       const stock = Number(product.stock);
       const price = Number(product.price);
-      if (!Number.isFinite(price) || price <= 0 || !Number.isInteger(stock) || stock < input.pieces) {
+      if (!Number.isFinite(price) || price <= 0
+          || (stockManagementEnabled
+            && (!Number.isInteger(stock) || stock < input.pieces))) {
         throw new HttpsError("failed-precondition", `There is not enough stock for ${product.name ?? input.productId}.`);
       }
       const lineTotal = price * input.pieces;
@@ -446,11 +452,13 @@ exports.placeOrder = onCall({ region }, async (request) => {
       });
     }
 
-    for (let index = 0; index < normalizedLines.length; index++) {
-      transaction.update(productRefs[index], {
-        stock: productSnapshots[index].data().stock - normalizedLines[index].pieces,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+    if (stockManagementEnabled) {
+      for (let index = 0; index < normalizedLines.length; index++) {
+        transaction.update(productRefs[index], {
+          stock: productSnapshots[index].data().stock - normalizedLines[index].pieces,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     }
 
     const now = new Date();

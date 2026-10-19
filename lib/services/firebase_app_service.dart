@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -31,9 +30,8 @@ class FirebaseAppService {
       firestore.doc('stores/$storeId/members/$uid');
 
   static DocumentReference<Map<String, dynamic>> applicationDocument(
-      String uid,
-      ) =>
-      firestore.doc('stores/$storeId/applications/$uid');
+    String uid,
+  ) => firestore.doc('stores/$storeId/applications/$uid');
 
   // ============================================================
   // CLOUD FUNCTION HELPER
@@ -47,9 +45,9 @@ class FirebaseAppService {
   // ============================================================
 
   static Future<dynamic> _callFunction(
-      String functionName,
-      Map<String, dynamic> data,
-      ) async {
+    String functionName,
+    Map<String, dynamic> data,
+  ) async {
     // ------------------------------------------------------------
     // WINDOWS DESKTOP
     // ------------------------------------------------------------
@@ -92,9 +90,7 @@ class FirebaseAppService {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
           },
-          body: jsonEncode({
-            'data': data,
-          }),
+          body: jsonEncode({'data': data}),
         );
 
         dynamic decoded;
@@ -108,10 +104,8 @@ class FirebaseAppService {
         // --------------------------------------------------------
         // SUCCESS
         // --------------------------------------------------------
-        if (response.statusCode >= 200 &&
-            response.statusCode < 300) {
-          if (decoded is Map<String, dynamic> &&
-              decoded.containsKey('data')) {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
             return decoded['data'];
           }
 
@@ -123,16 +117,12 @@ class FirebaseAppService {
         // --------------------------------------------------------
         if (decoded is Map<String, dynamic> &&
             decoded['error'] is Map<String, dynamic>) {
-          final error = Map<String, dynamic>.from(
-            decoded['error'] as Map,
-          );
+          final error = Map<String, dynamic>.from(decoded['error'] as Map);
 
-          final rawCode =
-              error['status']?.toString() ?? 'internal';
+          final rawCode = error['status']?.toString() ?? 'internal';
 
           final message =
-              error['message']?.toString() ??
-                  'Firebase Cloud Function failed.';
+              error['message']?.toString() ?? 'Firebase Cloud Function failed.';
 
           final details = error['details'];
 
@@ -146,7 +136,7 @@ class FirebaseAppService {
         throw FirebaseFunctionsException(
           code: 'internal',
           message:
-          'Cloud Function failed with HTTP ${response.statusCode}. '
+              'Cloud Function failed with HTTP ${response.statusCode}. '
               '${response.body}',
         );
       } catch (e) {
@@ -157,7 +147,7 @@ class FirebaseAppService {
         throw FirebaseFunctionsException(
           code: 'unavailable',
           message:
-          'Could not connect to Firebase Cloud Function '
+              'Could not connect to Firebase Cloud Function '
               '$functionName: $e',
         );
       }
@@ -237,17 +227,12 @@ class FirebaseAppService {
   // ACCOUNT APPLICATION
   // ============================================================
 
-  static Future<void> submitAccountApplication({
-    required String name,
-  }) async {
+  static Future<void> submitAccountApplication({required String name}) async {
     try {
-      await _callFunction(
-        'submitStoreAccountApplication',
-        {
-          'storeId': storeId,
-          'name': name.trim(),
-        },
-      );
+      await _callFunction('submitStoreAccountApplication', {
+        'storeId': storeId,
+        'name': name.trim(),
+      });
     } catch (e) {
       // Fallback for Windows desktop if Cloud Functions fail.
       final uid = auth.currentUser?.uid;
@@ -273,13 +258,10 @@ class FirebaseAppService {
 
   static Future<void> approveAccountApplication(String uid) async {
     try {
-      await _callFunction(
-        'approveStoreAccountApplication',
-        {
-          'storeId': storeId,
-          'uid': uid,
-        },
-      );
+      await _callFunction('approveStoreAccountApplication', {
+        'storeId': storeId,
+        'uid': uid,
+      });
     } catch (e) {
       final doc = await applicationDocument(uid).get();
       final data = doc.data();
@@ -313,13 +295,10 @@ class FirebaseAppService {
 
   static Future<void> rejectAccountApplication(String uid) async {
     try {
-      await _callFunction(
-        'rejectStoreAccountApplication',
-        {
-          'storeId': storeId,
-          'uid': uid,
-        },
-      );
+      await _callFunction('rejectStoreAccountApplication', {
+        'storeId': storeId,
+        'uid': uid,
+      });
     } catch (e) {
       await applicationDocument(uid).update({
         'status': 'rejected',
@@ -352,22 +331,21 @@ class FirebaseAppService {
     required bool canCreateBills,
   }) async {
     try {
-      await _callFunction(
-        'createStoreAccount',
-        {
-          'storeId': storeId,
-          'accountId': accountId,
-          'name': name,
-          'email': email,
-          'password': password,
-          'role': role,
-          'canShop': canShop,
-          'canManageStock': canManageStock,
-          'canCreateBills': canCreateBills,
-        },
-      );
+      await _callFunction('createStoreAccount', {
+        'storeId': storeId,
+        'accountId': accountId,
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': role,
+        'canShop': canShop,
+        'canManageStock': canManageStock,
+        'canCreateBills': canCreateBills,
+      });
     } catch (e) {
-      final docId = accountId.isEmpty ? 'USR-${DateTime.now().millisecondsSinceEpoch}' : accountId;
+      final docId = accountId.isEmpty
+          ? 'USR-${DateTime.now().millisecondsSinceEpoch}'
+          : accountId;
       final uid = 'usr_${DateTime.now().millisecondsSinceEpoch}';
       await memberDocument(uid).set({
         'uid': uid,
@@ -393,18 +371,13 @@ class FirebaseAppService {
     required String paymentMode,
     required List<Map<String, Object>> lines,
   }) async {
-    final result = await _callFunction(
-      'placeOrder',
-      {
-        'storeId': storeId,
-        if (customerUid != null)
-          'customerUid': customerUid,
-        if (manualCustomerDocumentId != null)
-          'manualCustomerDocumentId': manualCustomerDocumentId,
-        'paymentMode': paymentMode,
-        'lines': lines,
-      },
-    );
+    final result = await _callFunction('placeOrder', {
+      'storeId': storeId,
+      'customerUid': ?customerUid,
+      'manualCustomerDocumentId': ?manualCustomerDocumentId,
+      'paymentMode': paymentMode,
+      'lines': lines,
+    });
 
     if (result is Map<String, dynamic>) {
       return result;
@@ -428,13 +401,12 @@ class FirebaseAppService {
     required String id,
     required String name,
     required String phone,
-  }) =>
-      _collection('customers').doc(id).set({
-        'id': id,
-        'name': name.trim(),
-        'phone': phone.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+  }) => _collection('customers').doc(id).set({
+    'id': id,
+    'name': name.trim(),
+    'phone': phone.trim(),
+    'createdAt': FieldValue.serverTimestamp(),
+  });
 
   // ============================================================
   // PRODUCTION TASK
@@ -449,19 +421,18 @@ class FirebaseAppService {
     required String workerUid,
     required String workerName,
     required String assignedByName,
-  }) =>
-      _collection('productionTasks').doc(id).set({
-        'id': id,
-        'productId': productId,
-        'productName': productName,
-        'currentStock': currentStock,
-        'piecesToMake': piecesToMake,
-        'workerUid': workerUid,
-        'workerName': workerName,
-        'assignedByName': assignedByName,
-        'createdAt': FieldValue.serverTimestamp(),
-        'status': 'assigned',
-      });
+  }) => _collection('productionTasks').doc(id).set({
+    'id': id,
+    'productId': productId,
+    'productName': productName,
+    'currentStock': currentStock,
+    'piecesToMake': piecesToMake,
+    'workerUid': workerUid,
+    'workerName': workerName,
+    'assignedByName': assignedByName,
+    'createdAt': FieldValue.serverTimestamp(),
+    'status': 'assigned',
+  });
 
   // ============================================================
   // UPDATE PRODUCTION TASK STATUS
@@ -471,14 +442,11 @@ class FirebaseAppService {
     required String taskDocumentId,
     required String status,
   }) async {
-    await _callFunction(
-      'updateProductionTaskStatus',
-      {
-        'storeId': storeId,
-        'taskDocumentId': taskDocumentId,
-        'status': status,
-      },
-    );
+    await _callFunction('updateProductionTaskStatus', {
+      'storeId': storeId,
+      'taskDocumentId': taskDocumentId,
+      'status': status,
+    });
   }
 
   // ============================================================
@@ -489,14 +457,11 @@ class FirebaseAppService {
     required String orderDocumentId,
     required String status,
   }) async {
-    await _callFunction(
-      'updateOrderStatus',
-      {
-        'storeId': storeId,
-        'orderDocumentId': orderDocumentId,
-        'status': status,
-      },
-    );
+    await _callFunction('updateOrderStatus', {
+      'storeId': storeId,
+      'orderDocumentId': orderDocumentId,
+      'status': status,
+    });
   }
 
   // ============================================================
@@ -509,15 +474,12 @@ class FirebaseAppService {
     required double price,
   }) async {
     try {
-      await _callFunction(
-        'updateBillLinePrice',
-        {
-          'storeId': storeId,
-          'billDocumentId': billDocumentId,
-          'lineIndex': lineIndex,
-          'price': price,
-        },
-      );
+      await _callFunction('updateBillLinePrice', {
+        'storeId': storeId,
+        'billDocumentId': billDocumentId,
+        'lineIndex': lineIndex,
+        'price': price,
+      });
     } catch (e) {
       // Fallback for Windows desktop
       final docRef = _collection('bills').doc(billDocumentId);
@@ -525,7 +487,9 @@ class FirebaseAppService {
       if (snapshot.exists) {
         final data = snapshot.data()!;
         final lines = List<Map<String, dynamic>>.from(
-          (data['lines'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)),
+          (data['lines'] as List? ?? []).map(
+            (x) => Map<String, dynamic>.from(x),
+          ),
         );
         if (lineIndex >= 0 && lineIndex < lines.length) {
           lines[lineIndex]['price'] = price;
@@ -548,15 +512,12 @@ class FirebaseAppService {
     required int pieces,
   }) async {
     try {
-      await _callFunction(
-        'updateBillLineQuantity',
-        {
-          'storeId': storeId,
-          'billDocumentId': billDocumentId,
-          'lineIndex': lineIndex,
-          'pieces': pieces,
-        },
-      );
+      await _callFunction('updateBillLineQuantity', {
+        'storeId': storeId,
+        'billDocumentId': billDocumentId,
+        'lineIndex': lineIndex,
+        'pieces': pieces,
+      });
     } catch (e) {
       // Fallback for Windows desktop
       final docRef = _collection('bills').doc(billDocumentId);
@@ -564,7 +525,9 @@ class FirebaseAppService {
       if (snapshot.exists) {
         final data = snapshot.data()!;
         final lines = List<Map<String, dynamic>>.from(
-          (data['lines'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)),
+          (data['lines'] as List? ?? []).map(
+            (x) => Map<String, dynamic>.from(x),
+          ),
         );
         if (lineIndex >= 0 && lineIndex < lines.length) {
           lines[lineIndex]['pieces'] = pieces;
@@ -578,7 +541,12 @@ class FirebaseAppService {
   }
 
   static Future<void> deleteBill(String documentId) async {
-    await _collection('bills').doc(documentId).delete();
+    if (documentId.trim().isEmpty) return;
+    try {
+      await _collection('bills').doc(documentId).delete();
+    } catch (e) {
+      debugPrint('Delete bill error: $e');
+    }
   }
 
   // ============================================================
@@ -586,15 +554,74 @@ class FirebaseAppService {
   // ============================================================
 
   static Future<void> markOrderSeen(String documentId) =>
-      _collection('orders').doc(documentId).update({
-        'seenByStaff': true,
-      });
+      _collection('orders').doc(documentId).update({'seenByStaff': true});
+
+  static Future<void> saveBill(dynamic bill) async {
+    final docId = bill.documentId.isNotEmpty ? bill.documentId : bill.id;
+    await _collection('bills').doc(docId).set({
+      'id': bill.id,
+      'customer': bill.customer,
+      'customerId': bill.customerId,
+      'customerUid': bill.customerUid,
+      'createdAt': bill.createdAt,
+      'paymentMode': bill.paymentMode.name,
+      'createdByName': bill.createdByName,
+      'lines': bill.lines
+          .map(
+            (line) => <String, Object?>{
+              'productId': line.productId,
+              'name': line.name,
+              'quality': line.quality,
+              'price': line.price,
+              'pieces': line.pieces,
+            },
+          )
+          .toList(),
+      'payments': bill.payments
+          .map(
+            (p) => <String, Object?>{
+              'id': p.id,
+              'amount': p.amount,
+              'date': p.date,
+              'note': p.note,
+            },
+          )
+          .toList(),
+    });
+  }
+
+  static Future<void> saveOrder(dynamic order) async {
+    final docId = order.documentId.isNotEmpty ? order.documentId : order.id;
+    await _collection('orders').doc(docId).set({
+      'id': order.id,
+      'customerId': order.customerId,
+      'customerName': order.customerName,
+      'customerUid': order.customerUid,
+      'createdAt': order.createdAt,
+      'billId': order.billId,
+      'placedByName': order.placedByName,
+      'seenByStaff': order.seenByStaff,
+      'lines': order.lines
+          .map(
+            (line) => <String, Object?>{
+              'productId': line.productId,
+              'name': line.name,
+              'quality': line.quality,
+              'price': line.price,
+              'pieces': line.pieces,
+            },
+          )
+          .toList(),
+    });
+  }
 
   static Future<void> deleteOrder(String documentId) async {
     await _collection('orders').doc(documentId).delete();
   }
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> chatMessagesStream(String chatRoomId) {
+  static Stream<QuerySnapshot<Map<String, dynamic>>> chatMessagesStream(
+    String chatRoomId,
+  ) {
     return firestore
         .collection('stores/$storeId/chats/$chatRoomId/messages')
         .orderBy('createdAt', descending: false)
@@ -613,14 +640,14 @@ class FirebaseAppService {
     await firestore
         .collection('stores/$storeId/chats/$chatRoomId/messages')
         .add({
-      'senderUid': senderUid,
-      'senderName': senderName,
-      'text': text,
-      'createdAt': FieldValue.serverTimestamp(),
-      if (productId != null) 'productId': productId,
-      if (productName != null) 'productName': productName,
-      if (productImageUrl != null) 'productImageUrl': productImageUrl,
-    });
+          'senderUid': senderUid,
+          'senderName': senderName,
+          'text': text,
+          'createdAt': FieldValue.serverTimestamp(),
+          'productId': ?productId,
+          'productName': ?productName,
+          'productImageUrl': ?productImageUrl,
+        });
   }
 
   // ============================================================
@@ -637,51 +664,54 @@ class FirebaseAppService {
     required String quality,
     required double pricePerPiece,
     required int pieces,
-  }) =>
-      _collection('pendingRequests').doc(id).set({
-        'id': id,
-        'customerUid': customerUid,
-        'customerId': customerId,
-        'customerName': customerName,
-        'productId': productId,
-        'productName': productName,
-        'quality': quality,
-        'pricePerPiece': pricePerPiece,
-        'pieces': pieces,
-        'createdAt': FieldValue.serverTimestamp(),
-        'status': 'pending',
-      });
+  }) => _collection('pendingRequests').doc(id).set({
+    'id': id,
+    'customerUid': customerUid,
+    'customerId': customerId,
+    'customerName': customerName,
+    'productId': productId,
+    'productName': productName,
+    'quality': quality,
+    'pricePerPiece': pricePerPiece,
+    'pieces': pieces,
+    'createdAt': FieldValue.serverTimestamp(),
+    'status': 'pending',
+  });
 
   // ============================================================
   // UPDATE PENDING STATUS
   // ============================================================
 
   static Future<void> updatePendingStatus(
-      String documentId,
-      String status,
-      ) async {
-    await _callFunction(
-      'updatePendingStatus',
-      {
-        'storeId': storeId,
-        'requestDocumentId': documentId,
-        'status': status,
-      },
-    );
+    String documentId,
+    String status,
+  ) async {
+    await _callFunction('updatePendingStatus', {
+      'storeId': storeId,
+      'requestDocumentId': documentId,
+      'status': status,
+    });
+  }
+
+  static Future<void> updatePendingRequest({
+    required String documentId,
+    required int pieces,
+  }) => _collection('pendingRequests')
+      .doc(documentId)
+      .update({'pieces': pieces, 'updatedAt': FieldValue.serverTimestamp()});
+
+  static Future<void> deletePendingRequest(String documentId) async {
+    if (documentId.trim().isEmpty) return;
+    await _collection('pendingRequests').doc(documentId).delete();
   }
 
   // ============================================================
   // SAVE CART
   // ============================================================
 
-  static Future<void> saveCart(
-      String uid,
-      Map<String, int> items,
-      ) =>
-      firestore.doc('stores/$storeId/carts/$uid').set({
-        'items': items,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+  static Future<void> saveCart(String uid, Map<String, int> items) => firestore
+      .doc('stores/$storeId/carts/$uid')
+      .set({'items': items, 'updatedAt': FieldValue.serverTimestamp()});
 
   // ============================================================
   // SAVE PRODUCT
@@ -702,29 +732,23 @@ class FirebaseAppService {
     var savedImageUrl = imageUrl.trim();
 
     if (imageBytes != null && imageBytes.isNotEmpty) {
-      final user = auth.currentUser;
-
-      print('========== FIREBASE AUTH CHECK ==========');
-      print('User: $user');
-      print('UID: ${user?.uid}');
-      print('Email: ${user?.email}');
-      print('=========================================');
-
-      if (user == null) {
-        throw FirebaseException(
-          plugin: 'firebase_storage',
-          code: 'unauthorized',
-          message:
-          'You must be signed in before uploading a product image.',
+      if (imageBytes.length > 10 * 1024 * 1024) {
+        final sizeMb = (imageBytes.length / (1024 * 1024)).toStringAsFixed(1);
+        throw Exception(
+          'The photo size ($sizeMb MB) exceeds the 10 MB maximum limit.',
         );
       }
 
-      try {
-        final safeId = id.trim().replaceAll(
-          RegExp(r'[^a-zA-Z0-9_-]'),
-          '_',
-        );
+      if (auth.currentUser == null) {
+        try {
+          await auth.signInAnonymously();
+        } catch (e) {
+          debugPrint('Anonymous auth sign-in for storage upload: $e');
+        }
+      }
 
+      final safeId = id.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      try {
         final imageRef = FirebaseStorage.instance
             .ref()
             .child('stores')
@@ -732,7 +756,8 @@ class FirebaseAppService {
             .child('productImages')
             .child('$safeId.jpg');
 
-        final isPng = imageBytes.length >= 4 &&
+        final isPng =
+            imageBytes.length >= 4 &&
             imageBytes[0] == 0x89 &&
             imageBytes[1] == 0x50 &&
             imageBytes[2] == 0x4E &&
@@ -743,19 +768,23 @@ class FirebaseAppService {
           cacheControl: 'public,max-age=3600',
         );
 
-        await imageRef.putData(
-          imageBytes,
-          metadata,
-        );
-
+        await imageRef.putData(imageBytes, metadata);
         savedImageUrl = await imageRef.getDownloadURL();
-      } on FirebaseException catch (e) {
-        throw FirebaseException(
-          plugin: 'firebase_storage',
-          code: e.code,
-          message:
-          'Product image upload failed: ${e.message ?? e.code}',
+        debugPrint(
+          'Successfully uploaded product image to Firebase Storage: $savedImageUrl',
         );
+      } catch (e) {
+        debugPrint('Firebase Storage upload error: $e');
+        if (savedImageUrl.isEmpty) {
+          final isPng =
+              imageBytes.length >= 4 &&
+              imageBytes[0] == 0x89 &&
+              imageBytes[1] == 0x50 &&
+              imageBytes[2] == 0x4E &&
+              imageBytes[3] == 0x47;
+          final mime = isPng ? 'image/png' : 'image/jpeg';
+          savedImageUrl = 'data:$mime;base64,${base64Encode(imageBytes)}';
+        }
       }
     }
 
@@ -768,19 +797,39 @@ class FirebaseAppService {
       'imageUrl': savedImageUrl,
       'description': description,
       'category': category,
-      'createdAt': createdAt,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'createdAt': createdAt.toIso8601String(),
     });
 
     return savedImageUrl;
   }
 
-  // ============================================================
-  // DELETE PRODUCT
-  // ============================================================
+  static Future<void> deleteProduct(String id, {String? imageUrl}) async {
+    try {
+      await _collection('products').doc(id).delete();
+    } catch (e) {
+      debugPrint('Firestore product delete error: $e');
+    }
 
-  static Future<void> deleteProduct(String id) async {
-    await _collection('products').doc(id).delete();
+    try {
+      final safeId = id.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final imageRef = FirebaseStorage.instance
+          .ref()
+          .child('stores')
+          .child(storeId)
+          .child('productImages')
+          .child('$safeId.jpg');
+      await imageRef.delete();
+    } catch (e) {
+      debugPrint('Firebase storage product image delete error: $e');
+    }
+
+    if (imageUrl != null &&
+        imageUrl.isNotEmpty &&
+        imageUrl.startsWith('http')) {
+      try {
+        await FirebaseStorage.instance.refFromURL(imageUrl).delete();
+      } catch (_) {}
+    }
   }
 
   // ============================================================
@@ -790,10 +839,7 @@ class FirebaseAppService {
   static Future<void> saveCategory(String category) =>
       _collection('categories')
           .doc(_categoryKey(category))
-          .set({
-        'name': category,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+          .set({'name': category, 'createdAt': FieldValue.serverTimestamp()});
 
   static String _categoryKey(String value) => value
       .trim()
@@ -809,26 +855,30 @@ class FirebaseAppService {
     required String name,
     required String address,
     required String phone,
-  }) =>
-      firestore.doc('stores/$storeId/business/profile').set({
-        'name': name,
-        'address': address,
-        'phone': phone,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+    bool enableInventory = true,
+    bool enableProduction = true,
+    bool enableChat = true,
+  }) => firestore.doc('stores/$storeId/business/profile').set({
+    'name': name,
+    'address': address,
+    'phone': phone,
+    'enableInventory': enableInventory,
+    'enableProduction': enableProduction,
+    'enableChat': enableChat,
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 
   // ============================================================
   // ADD BILL PAYMENT
   // ============================================================
 
   static Future<void> addBillPayment(
-      String documentId,
-      Map<String, Object?> payment,
-      ) =>
-      _collection('bills').doc(documentId).update({
-        'payments': FieldValue.arrayUnion([payment]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+    String documentId,
+    Map<String, Object?> payment,
+  ) => _collection('bills').doc(documentId).update({
+    'payments': FieldValue.arrayUnion([payment]),
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 
   // ============================================================
   // UPDATE MEMBER PROFILE
@@ -841,51 +891,36 @@ class FirebaseAppService {
     bool? canShop,
     bool? canManageStock,
     bool? canCreateBills,
+    bool? phoneVerified,
   }) async {
     try {
-      await _callFunction(
-        'updateStoreMember',
-        {
-          'storeId': storeId,
-          'uid': uid,
-          if (name != null) 'name': name,
-          if (phone != null) 'phone': phone,
-          if (canShop != null) 'canShop': canShop,
-          if (canManageStock != null)
-            'canManageStock': canManageStock,
-          if (canCreateBills != null)
-            'canCreateBills': canCreateBills,
-        },
-      );
-    } catch (e) {
       await memberDocument(uid).update({
         if (name != null) 'name': name,
         if (phone != null) 'phone': phone,
         if (canShop != null) 'canShop': canShop,
-        if (canManageStock != null)
-          'canManageStock': canManageStock,
-        if (canCreateBills != null)
-          'canCreateBills': canCreateBills,
-        'updatedAt': FieldValue.serverTimestamp(),
+        if (canManageStock != null) 'canManageStock': canManageStock,
+        if (canCreateBills != null) 'canCreateBills': canCreateBills,
+        if (phoneVerified != null) 'phoneVerified': phoneVerified,
       });
+    } catch (e) {
+      debugPrint('Firestore update member error: ');
     }
   }
 
-  // ============================================================
-  // DELETE MEMBER
-  // ============================================================
-
   static Future<void> deleteMember(String uid) async {
     try {
-      await _callFunction(
-        'deleteStoreMember',
-        {
-          'storeId': storeId,
-          'uid': uid,
-        },
-      );
-    } catch (e) {
       await memberDocument(uid).delete();
+      await firestore.doc('stores/$storeId/customers/$uid').delete();
+    } catch (e) {
+      debugPrint('Firestore document delete error: $e');
+    }
+    try {
+      await _callFunction('deleteStoreMember', {
+        'storeId': storeId,
+        'uid': uid,
+      });
+    } catch (e) {
+      debugPrint('Cloud function deleteStoreMember error: $e');
     }
   }
 }

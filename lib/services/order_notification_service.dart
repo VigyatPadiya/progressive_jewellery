@@ -76,11 +76,13 @@ class OrderNotificationService {
     _tokenCollection = FirebaseFirestore.instance.collection(
       'stores/$storeId/members/$uid/tokens',
     );
+    // ignore: deprecated_member_use
     final token = await messaging.getToken();
     if (token != null && token.isNotEmpty) {
       await _saveToken(token);
     }
 
+    // ignore: deprecated_member_use
     _tokenSubscription = messaging.onTokenRefresh.listen(_saveToken);
     _messageSubscription = FirebaseMessaging.onMessage.listen(_showForeground);
   }
