@@ -3375,6 +3375,7 @@ class _ShopShellState extends State<ShopShell> {
     products: widget.store.products,
     categories: widget.store.categories,
     pendingRequests: widget.store.pendingRequests,
+    onOpenProduct: _openProductDetails,
     onCategoryAdded: (category) {
       setState(() {
         widget.store.categories.add(category);
@@ -5181,14 +5182,27 @@ class _ProductDetailsPageState extends State<_ProductDetailsPage> {
   Widget build(BuildContext context) {
     final product = widget.product;
     final inStock = widget.availablePieces > 0;
-    final image = ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: ProductImage(
-          url: product.imageUrl,
-          id: product.id,
-          bytes: product.imageBytes,
+    final image = GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _FullScreenImageViewer(
+            url: product.imageUrl,
+            id: product.id,
+            bytes: product.imageBytes,
+            title: product.name,
+          ),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: ProductImage(
+            url: product.imageUrl,
+            id: product.id,
+            bytes: product.imageBytes,
+          ),
         ),
       ),
     );
@@ -5458,8 +5472,9 @@ class ProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Widget imageWidget;
     if (bytes != null) {
-      return Container(
+      imageWidget = Container(
         color: _paper,
         child: Image.memory(
           bytes!,
@@ -5467,29 +5482,36 @@ class ProductImage extends StatelessWidget {
           errorBuilder: (context, error, stackTrace) => _placeholder(),
         ),
       );
-    }
-    if (url.trim().isEmpty) return _placeholder();
-    return Container(
-      color: _paper,
-      child: Image.network(
-        url,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => _placeholder(),
-        loadingBuilder: (context, child, progress) => progress == null
-            ? child
-            : Stack(
-                fit: StackFit.expand,
-                children: [
-                  _placeholder(),
-                  const Center(
-                    child: CircularProgressIndicator(
-                      color: _gold,
-                      strokeWidth: 2,
+    } else if (url.trim().isEmpty) {
+      return _placeholder();
+    } else {
+      imageWidget = Container(
+        color: _paper,
+        child: Image.network(
+          url,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => _placeholder(),
+          loadingBuilder: (context, child, progress) => progress == null
+              ? child
+              : Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _placeholder(),
+                    const Center(
+                      child: CircularProgressIndicator(
+                        color: _gold,
+                        strokeWidth: 2,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-      ),
+                  ],
+                ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onLongPress: () {},
+      child: imageWidget,
     );
   }
 
@@ -5531,6 +5553,61 @@ class ProductImage extends StatelessWidget {
   );
 }
 
+class _FullScreenImageViewer extends StatelessWidget {
+  const _FullScreenImageViewer({
+    required this.url,
+    required this.id,
+    this.bytes,
+    this.title = '',
+  });
+
+  final String url;
+  final String id;
+  final Uint8List? bytes;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.black,
+    appBar: AppBar(
+      backgroundColor: Colors.black,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title.isNotEmpty ? title : 'Full View',
+            style: const TextStyle(fontSize: 16, color: Colors.white),
+          ),
+          if (id.isNotEmpty)
+            Text(
+              'Product ID: $id',
+              style: const TextStyle(
+                fontSize: 11,
+                color: Colors.white54,
+                fontFamily: 'Arial',
+              ),
+            ),
+        ],
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+    ),
+    body: SafeArea(
+      child: Center(
+        child: InteractiveViewer(
+          minScale: 0.8,
+          maxScale: 4.0,
+          child: ProductImage(url: url, id: id, bytes: bytes),
+        ),
+      ),
+    ),
+  );
+}
+
 class _Badge extends StatelessWidget {
   const _Badge({required this.text, this.muted = false});
   final String text;
@@ -5564,6 +5641,7 @@ class InventoryPage extends StatelessWidget {
     required this.onCategoryAdded,
     required this.onChanged,
     required this.onDeleted,
+    this.onOpenProduct,
   });
   final List<Product> products;
   final Set<String> categories;
@@ -5571,6 +5649,7 @@ class InventoryPage extends StatelessWidget {
   final ValueChanged<String> onCategoryAdded;
   final void Function(Product product, String? oldId) onChanged;
   final ValueChanged<Product> onDeleted;
+  final ValueChanged<Product>? onOpenProduct;
 
   @override
   Widget build(BuildContext context) => _PageFrame(
@@ -5598,6 +5677,9 @@ class InventoryPage extends StatelessWidget {
                         .toList(),
                     onChanged: () => onChanged(product, null),
                     onEdit: () => _showProductForm(context, product: product),
+                    onOpenProduct: onOpenProduct == null
+                        ? null
+                        : () => onOpenProduct!(product),
                   ),
                 )
                 .toList(),
@@ -5652,11 +5734,13 @@ class _ProductRow extends StatelessWidget {
     required this.pendingRequests,
     required this.onChanged,
     required this.onEdit,
+    this.onOpenProduct,
   });
   final Product product;
   final List<PendingRequest> pendingRequests;
   final VoidCallback onChanged;
   final VoidCallback onEdit;
+  final VoidCallback? onOpenProduct;
 
   @override
   Widget build(BuildContext context) {
@@ -5673,72 +5757,84 @@ class _ProductRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(11),
-            child: SizedBox(
-              width: 76,
-              height: 76,
-              child: ProductImage(
-                url: product.imageUrl,
-                id: product.id,
-                bytes: product.imageBytes,
+          GestureDetector(
+            onTap: onOpenProduct,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: SizedBox(
+                width: 76,
+                height: 76,
+                child: ProductImage(
+                  url: product.imageUrl,
+                  id: product.id,
+                  bytes: product.imageBytes,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 15),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 17),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${product.id}  ·  ${product.quality}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: _muted,
-                    fontFamily: 'Arial',
-                    fontSize: 11,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onOpenProduct,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                      decorationStyle: TextDecorationStyle.dotted,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 7),
-                Wrap(
-                  spacing: 12,
-                  children: [
-                    Text(
-                      '${_money(product.price)} / piece',
-                      style: const TextStyle(
-                        fontFamily: 'Arial',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${product.id}  ·  ${product.quality}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _muted,
+                      fontFamily: 'Arial',
+                      fontSize: 11,
                     ),
-                    Text(
-                      '${product.stock} pieces in stock',
-                      style: const TextStyle(
-                        color: _muted,
-                        fontFamily: 'Arial',
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (openRequests > 0)
+                  ),
+                  const SizedBox(height: 7),
+                  Wrap(
+                    spacing: 12,
+                    children: [
                       Text(
-                        '$openRequests customer requests',
+                        '${_money(product.price)} / piece',
                         style: const TextStyle(
-                          color: _gold,
                           fontFamily: 'Arial',
-                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
                         ),
                       ),
-                  ],
-                ),
-              ],
+                      Text(
+                        '${product.stock} pieces in stock',
+                        style: const TextStyle(
+                          color: _muted,
+                          fontFamily: 'Arial',
+                          fontSize: 12,
+                        ),
+                      ),
+                      if (openRequests > 0)
+                        Text(
+                          '$openRequests customer requests',
+                          style: const TextStyle(
+                            color: _gold,
+                            fontFamily: 'Arial',
+                            fontSize: 11,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           IconButton(
