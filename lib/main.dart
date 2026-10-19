@@ -1030,6 +1030,37 @@ class Bill {
   double get balance => (total - paid).clamp(0, double.infinity).toDouble();
 }
 
+class _BillLineGroup {
+  _BillLineGroup({required this.name, required this.price});
+
+  final String name;
+  final double price;
+  final List<BillLine> lines = [];
+
+  int get pieces => lines.fold(0, (sum, line) => sum + line.pieces);
+  double get total => price * pieces;
+
+  String get description =>
+      lines.map((line) => '${line.productId} (${line.pieces})').join(', ');
+}
+
+List<_BillLineGroup> _groupBillLines(Bill bill) {
+  final groups = <_BillLineGroup>[];
+  for (final line in bill.lines) {
+    _BillLineGroup? group;
+    for (final candidate in groups) {
+      if (candidate.name == line.name && candidate.price == line.price) {
+        group = candidate;
+        break;
+      }
+    }
+    group ??= _BillLineGroup(name: line.name, price: line.price);
+    if (!groups.contains(group)) groups.add(group);
+    group.lines.add(line);
+  }
+  return groups;
+}
+
 Map<String, dynamic> _accountToLocal(Account account) => {
   'id': account.id,
   'uid': account.uid,
@@ -12060,7 +12091,7 @@ pw.Document _createReceiptPdf(BusinessProfile business, Bill bill) {
                   )
                   .toList(),
             ),
-            ...bill.lines.map(
+            ..._groupBillLines(bill).map(
               (line) => pw.TableRow(
                 children: [
                   pw.Padding(
@@ -12077,7 +12108,7 @@ pw.Document _createReceiptPdf(BusinessProfile business, Bill bill) {
                         ),
                         pw.SizedBox(height: 3),
                         pw.Text(
-                          '${line.productId}  |  ${line.quality}',
+                          line.description,
                           style: const pw.TextStyle(
                             fontSize: 8,
                             color: PdfColors.grey700,
