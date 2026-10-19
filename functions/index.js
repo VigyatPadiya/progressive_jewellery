@@ -400,8 +400,12 @@ exports.placeOrder = onCall({ region }, async (request) => {
       throw new HttpsError("permission-denied", "The store account could not be verified.");
     }
     const caller = callerSnapshot.data();
-    const stockManagementEnabled = !businessSnapshot.exists
-      || businessSnapshot.data().enableInventory !== false;
+    const businessData = businessSnapshot.exists ? businessSnapshot.data() : {};
+    const stockManagementEnabled = request.data?.stockManagementEnabled === false
+      ? false
+      : (request.data?.stockManagementEnabled === true
+        ? true
+        : businessData.enableInventory === true);
     const callerRole = String(caller.role ?? "customer").trim().toLowerCase();
     const customer = manualCustomerRef
       ? manualCustomerSnapshot.data()

@@ -369,6 +369,7 @@ class FirebaseAppService {
     String? customerUid,
     String? manualCustomerDocumentId,
     required String paymentMode,
+    bool stockManagementEnabled = true,
     required List<Map<String, Object>> lines,
   }) async {
     final result = await _callFunction('placeOrder', {
@@ -376,6 +377,7 @@ class FirebaseAppService {
       'customerUid': ?customerUid,
       'manualCustomerDocumentId': ?manualCustomerDocumentId,
       'paymentMode': paymentMode,
+      'stockManagementEnabled': stockManagementEnabled,
       'lines': lines,
     });
 
@@ -858,6 +860,7 @@ class FirebaseAppService {
     bool enableInventory = true,
     bool enableProduction = true,
     bool enableChat = true,
+    String? logoUrl,
   }) => firestore.doc('stores/$storeId/business/profile').set({
     'name': name,
     'address': address,
@@ -865,8 +868,36 @@ class FirebaseAppService {
     'enableInventory': enableInventory,
     'enableProduction': enableProduction,
     'enableChat': enableChat,
+    'logoUrl': ?logoUrl,
     'updatedAt': FieldValue.serverTimestamp(),
   });
+
+  static Future<String?> uploadBusinessLogo(Uint8List imageBytes) async {
+    if (imageBytes.length > 10 * 1024 * 1024) {
+      throw Exception('Logo image file is too large (max 10MB).');
+    }
+    try {
+      final imageRef = FirebaseStorage.instance
+          .ref('stores/$storeId/logo/store_logo.png');
+      final isPng = imageBytes.length >= 4 &&
+          imageBytes[0] == 0x89 &&
+          imageBytes[1] == 0x50 &&
+          imageBytes[2] == 0x4E &&
+          imageBytes[3] == 0x47;
+      final mime = isPng ? 'image/png' : 'image/jpeg';
+      final metadata = SettableMetadata(contentType: mime);
+      await imageRef.putData(imageBytes, metadata);
+      return await imageRef.getDownloadURL();
+    } catch (e) {
+      final isPng = imageBytes.length >= 4 &&
+          imageBytes[0] == 0x89 &&
+          imageBytes[1] == 0x50 &&
+          imageBytes[2] == 0x4E &&
+          imageBytes[3] == 0x47;
+      final mime = isPng ? 'image/png' : 'image/jpeg';
+      return 'data:$mime;base64,${base64Encode(imageBytes)}';
+    }
+  }
 
   // ============================================================
   // ADD BILL PAYMENT

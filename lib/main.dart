@@ -959,6 +959,8 @@ class BusinessProfile {
   bool enableInventory = true;
   bool enableProduction = true;
   bool enableChat = true;
+  String? logoUrl;
+  Uint8List? logoBytes;
 
   void loadFirestore(Map<String, dynamic> data) {
     name = data['name'] as String? ?? name;
@@ -967,6 +969,7 @@ class BusinessProfile {
     enableInventory = data['enableInventory'] != false;
     enableProduction = data['enableProduction'] != false;
     enableChat = data['enableChat'] != false;
+    logoUrl = data['logoUrl'] as String? ?? logoUrl;
   }
 }
 
@@ -3352,6 +3355,70 @@ class _ShopShellState extends State<ShopShell> {
     }
   }
 
+  Future<void> _receiveGeneralPayment() async {
+    final openBills = widget.store.bills
+        .where((b) => b.balance > 0)
+        .toList();
+    if (openBills.isEmpty) {
+      _snack('All bills are fully paid. There are no open balances due.');
+      return;
+    }
+    final selectedBill = await showDialog<Bill>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Receive Payment'),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Select a bill to record a customer payment:',
+                style: TextStyle(fontFamily: 'Arial', color: _muted, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: openBills.map((bill) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: _line),
+                        ),
+                        title: Text(
+                          '${bill.id} · ${bill.customer}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          'Total: ${_money(bill.total)}  ·  Balance due: ${_money(bill.balance)}',
+                          style: const TextStyle(color: _gold, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: _gold),
+                        onTap: () => Navigator.pop(ctx, bill),
+                      ),
+                    )).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (selectedBill == null || !mounted) return;
+    await _recordBillPayment(selectedBill);
+  }
+
   Future<void> _saveBillLines(Bill bill) async {
     if (widget.store.firebaseEnabled) {
       await _persist(() => FirebaseAppService.saveBill(bill));
@@ -3394,6 +3461,7 @@ class _ShopShellState extends State<ShopShell> {
       onDelete: staffCanEdit ? _deleteBill : null,
       onAddSale: staffCanEdit ? () => setState(() => _page = _Page.shop) : null,
       onRecordPayment: staffCanEdit ? _recordBillPayment : null,
+      onReceivePayment: staffCanEdit ? _receiveGeneralPayment : null,
     );
   }
 
@@ -3518,9 +3586,11 @@ class _ShopShellState extends State<ShopShell> {
     pendingRequests: widget.store.pendingRequests,
   );
 
-  Widget _settingsPage() => BusinessSettingsPage(
+  Widget _settingsPage() => SettingsPage(
     business: widget.store.business,
-    onOpenAccount: () => setState(() => _page = _Page.account),
+    account: widget.account,
+    store: widget.store,
+    firebaseEnabled: widget.store.firebaseEnabled,
     onChanged: () {
       setState(() {});
       unawaited(
@@ -3532,21 +3602,10 @@ class _ShopShellState extends State<ShopShell> {
             enableInventory: widget.store.business.enableInventory,
             enableProduction: widget.store.business.enableProduction,
             enableChat: widget.store.business.enableChat,
+            logoUrl: widget.store.business.logoUrl,
           ),
         ),
       );
-    },
-  );
-
-  Widget _accountPage() => AccountSettingsPage(
-    account: widget.account,
-    firebaseEnabled: widget.store.firebaseEnabled,
-    existingLogins: widget.store.accounts
-        .where((account) => account.id != widget.account.id)
-        .map((account) => account.login.toLowerCase())
-        .toSet(),
-    onChanged: () {
-      setState(() {});
       if (widget.store.firebaseEnabled && widget.account.uid != null) {
         unawaited(
           _persist(
@@ -3557,11 +3616,11 @@ class _ShopShellState extends State<ShopShell> {
             ),
           ),
         );
-      } else {
-        unawaited(widget.store.persistLocalData());
       }
     },
   );
+
+  Widget _accountPage() => _settingsPage();
 
   Widget _teamPage() => TeamPage(
     accounts: widget.store.accounts,
@@ -3749,7 +3808,8 @@ class _ShopShellState extends State<ShopShell> {
     }
     final existing = _cart[product.id];
     final next = (existing?.pieces ?? 0) + pieces;
-    if (next > _availablePieces(product) + (existing?.pieces ?? 0)) {
+    if (_stockManagementEnabled &&
+        next > _availablePieces(product) + (existing?.pieces ?? 0)) {
       _snack(
         'Only ${_availablePieces(product) + (existing?.pieces ?? 0)} pieces are available to add.',
       );
@@ -3868,6 +3928,7 @@ class _ShopShellState extends State<ShopShell> {
           customerUid: customerUid,
           manualCustomerDocumentId: customer.isWalkIn ? customer.id : null,
           paymentMode: selection.paymentMode.name,
+          stockManagementEnabled: _stockManagementEnabled,
           lines: lines
               .map(
                 (line) => <String, Object>{
@@ -4190,7 +4251,8 @@ class _ShopShellState extends State<ShopShell> {
         break;
       }
     }
-    if (product == null || _availablePieces(product) < request.pieces) {
+    if (product == null ||
+        (_stockManagementEnabled && _availablePieces(product) < request.pieces)) {
       _snack('Stock is not available yet.');
       return;
     }
@@ -4306,7 +4368,7 @@ class _ShopShellState extends State<ShopShell> {
       return;
     }
     final stockChange = line.pieces - pieces;
-    if (stockChange < 0 && product.stock < -stockChange) {
+    if (_stockManagementEnabled && stockChange < 0 && product.stock < -stockChange) {
       _snack('There is not enough stock to increase this bill quantity.');
       return;
     }
@@ -5918,49 +5980,66 @@ class _CartLineCard extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final compact = constraints.maxWidth < 500;
-      final image = ClipRRect(
-        borderRadius: BorderRadius.circular(11),
-        child: SizedBox(
-          width: compact ? 62 : 76,
-          height: compact ? 62 : 76,
-          child: ProductImage(
-            url: line.product.imageUrl,
-            id: line.product.id,
-            bytes: line.product.imageBytes,
+      void openDetails() {
+        final state = context.findAncestorStateOfType<_ShopShellState>();
+        state?._openProductDetails(line.product);
+      }
+      final image = GestureDetector(
+        onTap: openDetails,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: SizedBox(
+            width: compact ? 62 : 76,
+            height: compact ? 62 : 76,
+            child: ProductImage(
+              url: line.product.imageUrl,
+              id: line.product.id,
+              bytes: line.product.imageBytes,
+            ),
           ),
         ),
       );
       final details = Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              line.product.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${line.product.id} · ${line.product.quality}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: 'Arial',
-                color: _muted,
-                fontSize: 10,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: openDetails,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                line.product.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: _ink,
+                  decoration: TextDecoration.underline,
+                  decorationStyle: TextDecorationStyle.dotted,
+                ),
               ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              '${_money(line.product.price)} / piece',
-              style: const TextStyle(
-                fontFamily: 'Arial',
-                fontSize: 11,
-                color: _muted,
+              const SizedBox(height: 4),
+              Text(
+                '${line.product.id} · ${line.product.quality}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'Arial',
+                  color: _muted,
+                  fontSize: 10,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 7),
+              Text(
+                '${_money(line.product.price)} / piece',
+                style: const TextStyle(
+                  fontFamily: 'Arial',
+                  fontSize: 11,
+                  color: _muted,
+                ),
+              ),
+            ],
+          ),
         ),
       );
       final removeButton = IconButton(
@@ -6071,15 +6150,17 @@ class _QuantityControlState extends State<_QuantityControl> {
 
   void _updateQuantity() {
     final shell = context.findAncestorStateOfType<_ShopShellState>();
-    final available =
-        shell?._availablePieces(widget.line.product) ??
-        widget.line.product.stock;
+    final stockEnabled = shell?._stockManagementEnabled ?? true;
+    final available = stockEnabled
+        ? (shell?._availablePieces(widget.line.product) ??
+            widget.line.product.stock)
+        : 999999;
     final maxAllowed = available + widget.line.pieces;
 
     int? newPieces = int.tryParse(_controller.text);
     if (newPieces == null || newPieces < 1) {
       newPieces = 1;
-    } else if (newPieces > maxAllowed) {
+    } else if (stockEnabled && newPieces > maxAllowed) {
       newPieces = maxAllowed;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Only $maxAllowed pieces available.')),
@@ -6097,8 +6178,8 @@ class _QuantityControlState extends State<_QuantityControl> {
   @override
   Widget build(BuildContext context) {
     final shell = context.findAncestorStateOfType<_ShopShellState>();
-    final canAdd = shell == null
-        ? widget.line.pieces < widget.line.product.stock
+    final canAdd = shell == null || !shell._stockManagementEnabled
+        ? true
         : shell._availablePieces(widget.line.product) > 0;
     return Container(
       decoration: BoxDecoration(
@@ -6262,18 +6343,28 @@ class _CheckoutReviewDialogState extends State<_CheckoutReviewDialog> {
       ),
       FilledButton.icon(
         onPressed: () {
+          final shell = context.findAncestorStateOfType<_ShopShellState>();
+          final stockManagementEnabled =
+              shell?._stockManagementEnabled ?? false;
           final result = <String, int>{};
           for (final line in widget.cartLines) {
             final pieces = int.tryParse(
               _controllers[line.product.id]!.text.trim(),
             );
-            final maximum =
-                widget.initialBillPieces[line.product.id] ?? line.pieces;
-            if (pieces == null || pieces < 0 || pieces > maximum) {
+            final availableStock =
+                shell?._availablePieces(line.product) ?? line.product.stock;
+            final maxAllowed = stockManagementEnabled
+                ? availableStock + line.pieces
+                : 999999;
+            if (pieces == null ||
+                pieces < 0 ||
+                (stockManagementEnabled && pieces > maxAllowed)) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Bill quantity for ${line.product.name} must be between 0 and $maximum.',
+                    stockManagementEnabled
+                        ? 'Bill quantity for ${line.product.name} cannot exceed available stock ($maxAllowed pieces).'
+                        : 'Enter a valid bill quantity for ${line.product.name}.',
                   ),
                 ),
               );
@@ -6925,8 +7016,10 @@ class BillsPage extends StatelessWidget {
     this.onDelete,
     this.onAddSale,
     this.onRecordPayment,
+    this.onReceivePayment,
   });
   final void Function(Bill bill)? onRecordPayment;
+  final VoidCallback? onReceivePayment;
   final List<Bill> bills;
   final ValueChanged<Bill> onDownload;
   final bool canEditPrices;
@@ -6940,12 +7033,26 @@ class BillsPage extends StatelessWidget {
     eyebrow: 'CHECKOUT',
     title: 'Bills & receipts',
     description: 'A clear record of product ID, quality, pieces, unit price, and balance.',
-    action: onAddSale == null
+    action: (onAddSale == null && onReceivePayment == null)
         ? null
-        : FilledButton.icon(
-            onPressed: onAddSale,
-            icon: const Icon(Icons.add_shopping_cart, size: 18),
-            label: const Text('Add sale'),
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (onReceivePayment != null) ...[
+                OutlinedButton.icon(
+                  onPressed: onReceivePayment,
+                  icon: const Icon(Icons.add_card_outlined, size: 18),
+                  label: const Text('Add payment'),
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (onAddSale != null)
+                FilledButton.icon(
+                  onPressed: onAddSale,
+                  icon: const Icon(Icons.add_shopping_cart, size: 18),
+                  label: const Text('Add sale'),
+                ),
+            ],
           ),
     child: bills.isEmpty
         ? const _EmptyState(
@@ -7430,15 +7537,39 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
                   children: [
                     if (widget.onDelete != null)
                       TextButton.icon(
-                        onPressed: () {
-                          widget.onDelete!();
-                          Navigator.pop(context);
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Delete Bill & Receipt'),
+                              content: Text(
+                                'Are you sure you want to delete bill ${widget.bill.id}? This action cannot be undone.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                  ),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            widget.onDelete!();
+                            if (context.mounted) Navigator.pop(context);
+                          }
                         },
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.red,
                         ),
                         icon: const Icon(Icons.delete_outline, size: 18),
-                        label: const Text('Delete Bill'),
+                        label: const Text('Delete Bill / Receipt'),
                       ),
                     Row(
                       children: [
@@ -7488,6 +7619,32 @@ class _BillCard extends StatelessWidget {
   final void Function(Bill bill, int lineIndex)? onEditLinePrice;
   final void Function(Bill bill, int lineIndex)? onEditLineQuantity;
   final VoidCallback? onDelete;
+
+  Future<void> _confirmAndDelete(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Bill & Receipt'),
+        content: Text(
+          'Are you sure you want to delete bill ${bill.id}? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && onDelete != null) {
+      onDelete!();
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Material(
@@ -7578,8 +7735,20 @@ class _BillCard extends StatelessWidget {
                   ),
                 ),
                 Row(
-                  children: const [
-                    Text(
+                  children: [
+                    if (onDelete != null) ...[
+                      IconButton(
+                        tooltip: 'Delete Bill / Receipt',
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Colors.red,
+                        ),
+                        onPressed: () => _confirmAndDelete(context),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    const Text(
                       'Edit / View Bill',
                       style: TextStyle(
                         fontFamily: 'Arial',
@@ -7588,8 +7757,8 @@ class _BillCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    SizedBox(width: 4),
-                    Icon(Icons.arrow_forward_ios, size: 11, color: _gold),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_forward_ios, size: 11, color: _gold),
                   ],
                 ),
               ],
@@ -9563,261 +9732,289 @@ class _StatCard extends StatelessWidget {
   );
 }
 
-class BusinessSettingsPage extends StatefulWidget {
-  const BusinessSettingsPage({
+class SettingsPage extends StatefulWidget {
+  const SettingsPage({
     super.key,
     required this.business,
-    required this.onOpenAccount,
+    required this.account,
+    required this.store,
     required this.onChanged,
+    this.firebaseEnabled = false,
   });
+
   final BusinessProfile business;
-  final VoidCallback onOpenAccount;
+  final Account account;
+  final AppStore store;
   final VoidCallback onChanged;
+  final bool firebaseEnabled;
+
   @override
-  State<BusinessSettingsPage> createState() => _BusinessSettingsPageState();
+  State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _BusinessSettingsPageState extends State<BusinessSettingsPage> {
-  final _formKey = GlobalKey<FormState>();
-  late final _name = TextEditingController(text: widget.business.name);
-  late final _address = TextEditingController(text: widget.business.address);
-  late final _phone = TextEditingController(text: widget.business.phone);
+class _SettingsPageState extends State<SettingsPage> {
+  final _businessFormKey = GlobalKey<FormState>();
+  final _accountFormKey = GlobalKey<FormState>();
+
+  late final _businessName = TextEditingController(text: widget.business.name);
+  late final _businessAddress = TextEditingController(text: widget.business.address);
+  late final _businessPhone = TextEditingController(text: widget.business.phone);
+
+  late final _userName = TextEditingController(text: widget.account.name);
+  late final _userEmail = TextEditingController(text: widget.account.email);
+  late final _userPhone = TextEditingController(text: widget.account.phone);
+  final _userPassword = TextEditingController();
+
+  bool _businessExpanded = true;
+  bool _featuresExpanded = true;
+  bool _accountExpanded = true;
 
   @override
   void dispose() {
-    _name.dispose();
-    _address.dispose();
-    _phone.dispose();
+    _businessName.dispose();
+    _businessAddress.dispose();
+    _businessPhone.dispose();
+    _userName.dispose();
+    _userEmail.dispose();
+    _userPhone.dispose();
+    _userPassword.dispose();
     super.dispose();
+  }
+
+  void _autoSaveBusiness() {
+    widget.business.name = _businessName.text.trim();
+    widget.business.address = _businessAddress.text.trim();
+    widget.business.phone = _businessPhone.text.trim();
+    widget.onChanged();
+  }
+
+  void _saveAccount() {
+    if (!_accountFormKey.currentState!.validate()) return;
+    widget.account.name = _userName.text.trim();
+    widget.account.email = _userEmail.text.trim();
+    widget.account.phone = _userPhone.text.trim();
+    if (!widget.firebaseEnabled && _userPassword.text.isNotEmpty) {
+      widget.account.password = _userPassword.text;
+    }
+    widget.onChanged();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account profile saved.')),
+    );
+  }
+
+  Future<void> _pickAndSaveLogo() async {
+    try {
+      final file = await FilePicker.pickFile(type: FileType.image);
+      if (file != null) {
+        final bytes = await file.readAsBytes();
+        if (bytes.isNotEmpty) {
+          setState(() {
+            widget.business.logoBytes = bytes;
+            widget.business.logoUrl =
+                'data:image/png;base64,${base64Encode(bytes)}';
+          });
+          if (widget.firebaseEnabled) {
+            try {
+              final url = await FirebaseAppService.uploadBusinessLogo(bytes);
+              if (url != null) widget.business.logoUrl = url;
+            } catch (_) {}
+          }
+          _autoSaveBusiness();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Store logo updated!')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update logo: $e')),
+        );
+      }
+    }
+  }
+
+  void _resetLogo() {
+    setState(() {
+      widget.business.logoBytes = null;
+      widget.business.logoUrl = null;
+    });
+    _autoSaveBusiness();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Logo reset to default.')),
+    );
   }
 
   @override
   Widget build(BuildContext context) => _PageFrame(
     eyebrow: 'SETTINGS',
-    title: 'Settings',
+    title: 'Settings & account',
     description:
-        'Manage the store profile, workspace features, and your account.',
-    child: Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _line),
-        borderRadius: BorderRadius.circular(17),
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextFormField(
-              controller: _name,
-              decoration: const InputDecoration(labelText: 'Business name'),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Enter the business name'
-                  : null,
-            ),
-            const SizedBox(height: 13),
-            TextFormField(
-              controller: _address,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Address (optional)',
-              ),
-            ),
-            const SizedBox(height: 13),
-            TextFormField(
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Business phone (optional)',
-              ),
-            ),
-            const SizedBox(height: 22),
-            const Text(
-              'Store features',
-              style: TextStyle(
-                fontFamily: 'Arial',
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Choose which areas are available in the workspace navigation.',
-              style: TextStyle(
-                fontFamily: 'Arial',
-                color: _muted,
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Stock management'),
-              subtitle: const Text('Show inventory and stock controls.'),
-              value: widget.business.enableInventory,
-              onChanged: (value) =>
-                  setState(() => widget.business.enableInventory = value),
-            ),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Production'),
-              subtitle: const Text('Show production tasks and assignments.'),
-              value: widget.business.enableProduction,
-              onChanged: (value) =>
-                  setState(() => widget.business.enableProduction = value),
-            ),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Chat & support'),
-              subtitle: const Text('Show store chat in the workspace.'),
-              value: widget.business.enableChat,
-              onChanged: (value) =>
-                  setState(() => widget.business.enableChat = value),
-            ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: _save,
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('Save business profile'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: widget.onOpenAccount,
-              icon: const Icon(Icons.manage_accounts_outlined),
-              label: const Text('Account settings'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    widget.business.name = _name.text.trim();
-    widget.business.address = _address.text.trim();
-    widget.business.phone = _phone.text.trim();
-    widget.onChanged();
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Business profile saved.')));
-  }
-}
-
-class AccountSettingsPage extends StatefulWidget {
-  const AccountSettingsPage({
-    super.key,
-    required this.account,
-    required this.existingLogins,
-    required this.onChanged,
-    this.firebaseEnabled = false,
-  });
-  final Account account;
-  final Set<String> existingLogins;
-  final VoidCallback onChanged;
-  final bool firebaseEnabled;
-  @override
-  State<AccountSettingsPage> createState() => _AccountSettingsPageState();
-}
-
-class _AccountSettingsPageState extends State<AccountSettingsPage> {
-  final _formKey = GlobalKey<FormState>();
-  late final _name = TextEditingController(text: widget.account.name);
-  late final _email = TextEditingController(text: widget.account.email);
-  late final _phone = TextEditingController(text: widget.account.phone);
-  late final _login = TextEditingController(text: widget.account.login);
-  final _password = TextEditingController();
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _email.dispose();
-    _phone.dispose();
-    _login.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => _PageFrame(
-    eyebrow: 'MY ACCOUNT',
-    title: 'Profile & account settings',
-    description: widget.firebaseEnabled
-        ? 'Manage your name, contact phone number, and account information.'
-        : 'Update your name, phone number, and sign-in details.',
+        'Manage store profile, workspace features, and your user account.',
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: _line),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: const Color(0xFFF1EBDD),
-                foregroundColor: _gold,
-                child: Text(
-                  widget.account.name.isEmpty
-                      ? '?'
-                      : widget.account.name[0].toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Arial',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.account.name.isEmpty
-                          ? 'Account User'
-                          : widget.account.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Arial',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Account ID: ${widget.account.id}',
-                      style: const TextStyle(
-                        color: _muted,
-                        fontSize: 12,
-                        fontFamily: 'Arial',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _RolePill(role: widget.account.role),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: _line),
-            borderRadius: BorderRadius.circular(17),
-          ),
+        _buildSectionCard(
+          title: 'Business Profile & Logo',
+          subtitle: 'Store details and custom header logo',
+          icon: Icons.storefront_outlined,
+          expanded: _businessExpanded,
+          onToggle: () => setState(() => _businessExpanded = !_businessExpanded),
           child: Form(
-            key: _formKey,
+            key: _businessFormKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildLogoSection(),
+                const SizedBox(height: 18),
+                const Divider(color: _line),
+                const SizedBox(height: 14),
                 TextFormField(
-                  controller: _name,
+                  controller: _businessName,
+                  decoration: const InputDecoration(
+                    labelText: 'Business name',
+                    prefixIcon: Icon(Icons.business_outlined),
+                  ),
+                  onChanged: (_) => _autoSaveBusiness(),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _businessAddress,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Address (optional)',
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                  ),
+                  onChanged: (_) => _autoSaveBusiness(),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _businessPhone,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Business phone (optional)',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                  onChanged: (_) => _autoSaveBusiness(),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildSectionCard(
+          title: 'Workspace Features & Controls',
+          subtitle: 'Inventory stock management, production, and support',
+          icon: Icons.tune_outlined,
+          expanded: _featuresExpanded,
+          onToggle: () => setState(() => _featuresExpanded = !_featuresExpanded),
+          child: Column(
+            children: [
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Stock management'),
+                subtitle: const Text('Show inventory and stock controls.'),
+                value: widget.business.enableInventory,
+                onChanged: (value) {
+                  setState(() => widget.business.enableInventory = value);
+                  _autoSaveBusiness();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        value
+                            ? 'Stock management enabled.'
+                            : 'Stock management disabled. Orders/bills will bypass stock limits.',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const Divider(color: _line),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Production'),
+                subtitle: const Text('Show production tasks and assignments.'),
+                value: widget.business.enableProduction,
+                onChanged: (value) {
+                  setState(() => widget.business.enableProduction = value);
+                  _autoSaveBusiness();
+                },
+              ),
+              const Divider(color: _line),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Chat & support'),
+                subtitle: const Text('Show store chat in workspace.'),
+                value: widget.business.enableChat,
+                onChanged: (value) {
+                  setState(() => widget.business.enableChat = value);
+                  _autoSaveBusiness();
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildSectionCard(
+          title: 'My Account & Profile',
+          subtitle: '${widget.account.name} · ${widget.account.role.label}',
+          icon: Icons.person_outline,
+          expanded: _accountExpanded,
+          onToggle: () => setState(() => _accountExpanded = !_accountExpanded),
+          child: Form(
+            key: _accountFormKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: const Color(0xFFF1EBDD),
+                      foregroundColor: _gold,
+                      child: Text(
+                        widget.account.name.isEmpty
+                            ? '?'
+                            : widget.account.name[0].toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.account.name.isEmpty
+                                ? 'Account User'
+                                : widget.account.name,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Account ID: ${widget.account.id}',
+                            style: const TextStyle(
+                              color: _muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _RolePill(role: widget.account.role),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _userName,
                   decoration: const InputDecoration(
                     labelText: 'Full name',
                     prefixIcon: Icon(Icons.person_outline),
@@ -9826,18 +10023,18 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                       ? 'Enter your name'
                       : null,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 TextFormField(
-                  controller: _email,
+                  controller: _userEmail,
                   readOnly: widget.firebaseEnabled,
                   decoration: const InputDecoration(
                     labelText: 'Email address',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 TextFormField(
-                  controller: _phone,
+                  controller: _userPhone,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
                     labelText: 'Phone number',
@@ -9845,9 +10042,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                   ),
                 ),
                 if (!widget.firebaseEnabled) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   TextFormField(
-                    controller: _password,
+                    controller: _userPassword,
                     obscureText: true,
                     decoration: const InputDecoration(
                       labelText: 'New password (leave blank to keep current)',
@@ -9855,11 +10052,11 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 22),
+                const SizedBox(height: 18),
                 FilledButton.icon(
-                  onPressed: _save,
+                  onPressed: _saveAccount,
                   icon: const Icon(Icons.save_outlined),
-                  label: const Text('Save profile changes'),
+                  label: const Text('Save account profile'),
                 ),
               ],
             ),
@@ -9869,20 +10066,177 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     ),
   );
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    widget.account.name = _name.text.trim();
-    widget.account.email = _email.text.trim();
-    widget.account.phone = _phone.text.trim();
-    if (!widget.firebaseEnabled) {
-      widget.account.login = _login.text.trim();
-      if (_password.text.isNotEmpty) widget.account.password = _password.text;
-    }
-    widget.onChanged();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile updated successfully.')),
-    );
-  }
+  Widget _buildLogoSection() => Row(
+    children: [
+      Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: _gold, width: 2),
+        ),
+        child: widget.business.logoBytes != null && widget.business.logoBytes!.isNotEmpty
+            ? ClipOval(
+                child: Image.memory(
+                  widget.business.logoBytes!,
+                  fit: BoxFit.cover,
+                  width: 52,
+                  height: 52,
+                ),
+              )
+            : (widget.business.logoUrl != null && widget.business.logoUrl!.trim().isNotEmpty)
+                ? ClipOval(
+                    child: widget.business.logoUrl!.startsWith('data:image')
+                        ? Image.memory(
+                            base64Decode(widget.business.logoUrl!.split(',').last),
+                            fit: BoxFit.cover,
+                            width: 52,
+                            height: 52,
+                          )
+                        : Image.network(
+                            widget.business.logoUrl!,
+                            fit: BoxFit.cover,
+                            width: 52,
+                            height: 52,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(
+                                Icons.diamond_outlined,
+                                color: _gold,
+                                size: 26,
+                              ),
+                            ),
+                          ),
+                  )
+                : const Center(
+                    child: Icon(
+                      Icons.diamond_outlined,
+                      color: _gold,
+                      size: 26,
+                    ),
+                  ),
+      ),
+      const SizedBox(width: 14),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Store Logo',
+              style: TextStyle(
+                fontFamily: 'Arial',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Upload a custom image logo to display in the header.',
+              style: TextStyle(
+                fontFamily: 'Arial',
+                color: _muted,
+                fontSize: 11,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickAndSaveLogo,
+                  icon: const Icon(Icons.upload_file_outlined, size: 16),
+                  label: const Text('Change Logo'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                if (widget.business.logoBytes != null ||
+                    (widget.business.logoUrl != null &&
+                        widget.business.logoUrl!.isNotEmpty)) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: _resetLogo,
+                    icon: const Icon(Icons.refresh_outlined, size: 16),
+                    label: const Text('Reset Logo'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  Widget _buildSectionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool expanded,
+    required VoidCallback onToggle,
+    required Widget child,
+  }) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _line),
+    ),
+    child: Column(
+      children: [
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Icon(icon, color: _gold, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontFamily: 'Arial',
+                          color: _muted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  color: _muted,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (expanded) ...[
+          const Divider(height: 1, color: _line),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: child,
+          ),
+        ],
+      ],
+    ),
+  );
 }
 
 class _AccountApplicationCard extends StatelessWidget {
@@ -10857,7 +11211,7 @@ class _EmptyState extends StatelessWidget {
   );
 }
 
-class _TopBar extends StatelessWidget {
+class _TopBar extends StatefulWidget {
   const _TopBar({
     this.onMenu,
     required this.cartCount,
@@ -10872,18 +11226,83 @@ class _TopBar extends StatelessWidget {
   final ValueChanged<String> onSearch;
   final VoidCallback? onCart;
   final VoidCallback? onOrders;
+
+  @override
+  State<_TopBar> createState() => _TopBarState();
+}
+
+class _TopBarState extends State<_TopBar> {
+  bool _mobileSearchExpanded = false;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
+    final isMobile = width < 580;
     final tiny = width < 430;
+
+    if (isMobile && _mobileSearchExpanded) {
+      return Container(
+        height: 72,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: _line)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 40,
+                child: TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  onChanged: widget.onSearch,
+                  decoration: InputDecoration(
+                    hintText: 'Search collection...',
+                    prefixIcon: const Icon(Icons.search, size: 19),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              widget.onSearch('');
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Close search',
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                setState(() => _mobileSearchExpanded = false);
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      height: 76,
+      height: 74,
       padding: EdgeInsets.symmetric(
         horizontal: width < 380
-            ? 12
-            : width < 430
-            ? 16
-            : 25,
+            ? 10
+            : width < 480
+            ? 14
+            : 24,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -10891,57 +11310,80 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (onMenu != null)
+          if (widget.onMenu != null)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.only(right: 6),
               child: IconButton(
                 tooltip: 'Open navigation',
-                onPressed: onMenu,
+                onPressed: widget.onMenu,
                 icon: const Icon(Icons.menu_outlined),
               ),
             ),
-          if (width >= 500) _BrandLockup(compact: width < 760),
-          const SizedBox(width: 12),
+          _BrandLockup(compact: isMobile),
+          const SizedBox(width: 8),
           Expanded(
             child: Align(
               alignment: Alignment.centerRight,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: width >= 760 ? 280 : 210),
-                child: SizedBox(
-                  height: 41,
-                  child: TextField(
-                    onChanged: onSearch,
-                    decoration: const InputDecoration(
-                      hintText: 'Find a piece...',
-                      prefixIcon: Icon(Icons.search, size: 19),
-                      contentPadding: EdgeInsets.symmetric(vertical: 7),
-                      isDense: true,
+              child: isMobile
+                  ? IconButton(
+                      tooltip: 'Search items',
+                      icon: const Icon(Icons.search),
+                      onPressed: () =>
+                          setState(() => _mobileSearchExpanded = true),
+                    )
+                  : ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: width >= 900 ? 320 : 220,
+                      ),
+                      child: SizedBox(
+                        height: 40,
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: widget.onSearch,
+                          decoration: InputDecoration(
+                            hintText: 'Find a piece...',
+                            prefixIcon: const Icon(Icons.search, size: 19),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 16),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      widget.onSearch('');
+                                      setState(() {});
+                                    },
+                                  )
+                                : null,
+                            contentPadding:
+                                const EdgeInsets.symmetric(vertical: 8),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
             ),
           ),
-          if (onCart != null)
+          if (widget.onCart != null)
             Padding(
-              padding: const EdgeInsets.only(left: 7),
+              padding: const EdgeInsets.only(left: 4),
               child: _CartIcon(
-                count: cartCount,
-                onPressed: onCart!,
+                count: widget.cartCount,
+                onPressed: widget.onCart!,
                 compact: tiny,
               ),
             ),
-          if (onOrders != null)
-            IconButton(
-              tooltip: 'Orders and notifications',
-              constraints: tiny
-                  ? const BoxConstraints.tightFor(width: 36, height: 36)
-                  : null,
-              padding: tiny ? const EdgeInsets.all(6) : null,
-              onPressed: onOrders,
-              icon: _OrdersIcon(count: orderCount),
+          if (widget.onOrders != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: IconButton(
+                tooltip: 'Orders and notifications',
+                constraints: tiny
+                    ? const BoxConstraints.tightFor(width: 36, height: 36)
+                    : null,
+                padding: tiny ? const EdgeInsets.all(6) : null,
+                onPressed: widget.onOrders,
+                icon: _OrdersIcon(count: widget.orderCount),
+              ),
             ),
-          const SizedBox(width: 10),
         ],
       ),
     );
@@ -11110,8 +11552,8 @@ class _Sidebar extends StatelessWidget {
                         children: [
                           Text(
                             account.name.isEmpty
-                                ? 'Settings & account'
-                                : 'Settings · ${account.name}',
+                                ? 'User account'
+                                : account.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -11684,49 +12126,166 @@ class _BrandLockup extends StatelessWidget {
   final bool light;
   final bool compact;
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: compact ? 33 : 39,
-        height: compact ? 33 : 39,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: light ? const Color(0xFFDBC595) : _gold),
+  Widget build(BuildContext context) {
+    final shell = context.findAncestorStateOfType<_ShopShellState>();
+    final business = shell?.widget.store.business;
+    final logoBytes = business?.logoBytes;
+    final logoUrl = business?.logoUrl;
+
+    Widget logoWidget;
+    if (logoBytes != null && logoBytes.isNotEmpty) {
+      logoWidget = ClipOval(
+        child: Image.memory(
+          logoBytes,
+          width: compact ? 34 : 40,
+          height: compact ? 34 : 40,
+          fit: BoxFit.cover,
         ),
-        child: Icon(
-          Icons.auto_awesome,
-          size: compact ? 17 : 20,
-          color: light ? const Color(0xFFDBC595) : _gold,
-        ),
-      ),
-      const SizedBox(width: 11),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'PROGRESSIVE',
-            style: TextStyle(
-              color: light ? Colors.white : _ink,
-              fontFamily: 'Georgia',
-              fontSize: compact ? 12 : 14,
-              letterSpacing: 1.7,
+      );
+    } else if (logoUrl != null && logoUrl.trim().isNotEmpty) {
+      if (logoUrl.startsWith('data:image')) {
+        try {
+          final base64Str = logoUrl.split(',').last;
+          final bytes = base64Decode(base64Str);
+          logoWidget = ClipOval(
+            child: Image.memory(
+              bytes,
+              width: compact ? 34 : 40,
+              height: compact ? 34 : 40,
+              fit: BoxFit.cover,
             ),
+          );
+        } catch (_) {
+          logoWidget = _defaultIcon();
+        }
+      } else {
+        logoWidget = ClipOval(
+          child: Image.network(
+            logoUrl,
+            width: compact ? 34 : 40,
+            height: compact ? 34 : 40,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _defaultIcon(),
           ),
-          if (!compact)
+        );
+      }
+    } else {
+      logoWidget = _defaultIcon();
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        logoWidget,
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'PROGRESSIVE',
+              style: TextStyle(
+                color: light ? Colors.white : _ink,
+                fontFamily: 'Georgia',
+                fontSize: compact ? 12 : 14,
+                fontWeight: FontWeight.bold,
+                letterSpacing: compact ? 1.2 : 1.7,
+              ),
+            ),
             Text(
               'J E W E L L E R Y',
               style: TextStyle(
                 color: light ? Colors.white70 : _muted,
                 fontFamily: 'Arial',
-                fontSize: 8,
-                letterSpacing: 1.55,
+                fontSize: compact ? 7 : 8,
+                fontWeight: FontWeight.w600,
+                letterSpacing: compact ? 1.1 : 1.55,
               ),
             ),
-        ],
-      ),
-    ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _defaultIcon() => _PMarkWidget(
+    size: compact ? 34 : 40,
+    color: light ? const Color(0xFFDBC595) : _ink,
   );
+}
+
+class _PMarkWidget extends StatelessWidget {
+  const _PMarkWidget({required this.size, required this.color});
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size,
+    height: size,
+    child: CustomPaint(
+      painter: _PMarkPainter(color: color),
+    ),
+  );
+}
+
+class _PMarkPainter extends CustomPainter {
+  _PMarkPainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final center = Offset(w / 2, h / 2);
+    final strokeWidth = w * 0.075;
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromCircle(center: center, radius: w * 0.42);
+    canvas.drawArc(rect, -2.5, 4.9, false, paint);
+
+    final innerPaint = Paint()
+      ..color = color.withValues(alpha: .45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth * 0.65;
+    final innerRect = Rect.fromCircle(
+      center: Offset(center.dx - w * 0.03, center.dy + h * 0.02),
+      radius: w * 0.46,
+    );
+    canvas.drawArc(innerRect, -2.8, 3.2, false, innerPaint);
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: 'P',
+        style: TextStyle(
+          color: color,
+          fontFamily: 'Georgia',
+          fontSize: size.width * 0.54,
+          fontWeight: FontWeight.bold,
+          fontStyle: FontStyle.italic,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(
+        center.dx - textPainter.width / 2,
+        center.dy - textPainter.height / 2,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PMarkPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class _Overline extends StatelessWidget {
