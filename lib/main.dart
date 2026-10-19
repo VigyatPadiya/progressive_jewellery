@@ -1025,6 +1025,7 @@ class Bill {
   final PaymentMode paymentMode;
   final List<PaymentEntry> payments;
   double get total => lines.fold(0, (sum, line) => sum + line.total);
+  int get totalPieces => lines.fold(0, (sum, line) => sum + line.pieces);
   double get paid => payments.fold(0, (sum, payment) => sum + payment.amount);
   double get balance => (total - paid).clamp(0, double.infinity).toDouble();
 }
@@ -3356,9 +3357,7 @@ class _ShopShellState extends State<ShopShell> {
   }
 
   Future<void> _receiveGeneralPayment() async {
-    final openBills = widget.store.bills
-        .where((b) => b.balance > 0)
-        .toList();
+    final openBills = widget.store.bills.where((b) => b.balance > 0).toList();
     if (openBills.isEmpty) {
       _snack('All bills are fully paid. There are no open balances due.');
       return;
@@ -3375,32 +3374,54 @@ class _ShopShellState extends State<ShopShell> {
             children: [
               const Text(
                 'Select a bill to record a customer payment:',
-                style: TextStyle(fontFamily: 'Arial', color: _muted, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: 'Arial',
+                  color: _muted,
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 12),
               Flexible(
                 child: SingleChildScrollView(
                   child: Column(
-                    children: openBills.map((bill) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: _line),
-                        ),
-                        title: Text(
-                          '${bill.id} · ${bill.customer}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                        subtitle: Text(
-                          'Total: ${_money(bill.total)}  ·  Balance due: ${_money(bill.balance)}',
-                          style: const TextStyle(color: _gold, fontSize: 12, fontWeight: FontWeight.w600),
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: _gold),
-                        onTap: () => Navigator.pop(ctx, bill),
-                      ),
-                    )).toList(),
+                    children: openBills
+                        .map(
+                          (bill) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 4,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: const BorderSide(color: _line),
+                              ),
+                              title: Text(
+                                '${bill.id} · ${bill.customer}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Total: ${_money(bill.total)}  ·  Balance due: ${_money(bill.balance)}',
+                                style: const TextStyle(
+                                  color: _gold,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              trailing: const Icon(
+                                Icons.arrow_forward_ios,
+                                size: 14,
+                                color: _gold,
+                              ),
+                              onTap: () => Navigator.pop(ctx, bill),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
               ),
@@ -3417,6 +3438,49 @@ class _ShopShellState extends State<ShopShell> {
     );
     if (selectedBill == null || !mounted) return;
     await _recordBillPayment(selectedBill);
+  }
+
+  Future<void> _receiveCustomerPayment(Account customer) async {
+    final openBills = widget.store.bills
+        .where((bill) => bill.customerId == customer.id && bill.balance > 0)
+        .toList();
+    if (openBills.isEmpty) {
+      _snack('This customer has no outstanding balance.');
+      return;
+    }
+    final selectedBill = await showDialog<Bill>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Payment for ${customer.name}'),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: openBills
+                .map(
+                  (bill) => ListTile(
+                    title: Text(bill.id),
+                    subtitle: Text(
+                      '${bill.totalPieces} pieces · Balance due: ${_money(bill.balance)}',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: () => Navigator.pop(ctx, bill),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (selectedBill != null && mounted) {
+      await _recordBillPayment(selectedBill);
+    }
   }
 
   Future<void> _saveBillLines(Bill bill) async {
@@ -3548,6 +3612,7 @@ class _ShopShellState extends State<ShopShell> {
     orders: widget.store.orders,
     pendingRequests: widget.store.pendingRequests,
     products: widget.store.products,
+    onReceivePayment: _receiveCustomerPayment,
     onPayment: (bill, amount) {
       setState(() {
         bill.payments.add(
@@ -4252,7 +4317,8 @@ class _ShopShellState extends State<ShopShell> {
       }
     }
     if (product == null ||
-        (_stockManagementEnabled && _availablePieces(product) < request.pieces)) {
+        (_stockManagementEnabled &&
+            _availablePieces(product) < request.pieces)) {
       _snack('Stock is not available yet.');
       return;
     }
@@ -4368,7 +4434,9 @@ class _ShopShellState extends State<ShopShell> {
       return;
     }
     final stockChange = line.pieces - pieces;
-    if (_stockManagementEnabled && stockChange < 0 && product.stock < -stockChange) {
+    if (_stockManagementEnabled &&
+        stockChange < 0 &&
+        product.stock < -stockChange) {
       _snack('There is not enough stock to increase this bill quantity.');
       return;
     }
@@ -5984,6 +6052,7 @@ class _CartLineCard extends StatelessWidget {
         final state = context.findAncestorStateOfType<_ShopShellState>();
         state?._openProductDetails(line.product);
       }
+
       final image = GestureDetector(
         onTap: openDetails,
         child: ClipRRect(
@@ -6153,7 +6222,7 @@ class _QuantityControlState extends State<_QuantityControl> {
     final stockEnabled = shell?._stockManagementEnabled ?? true;
     final available = stockEnabled
         ? (shell?._availablePieces(widget.line.product) ??
-            widget.line.product.stock)
+              widget.line.product.stock)
         : 999999;
     final maxAllowed = available + widget.line.pieces;
 
@@ -7361,18 +7430,33 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _SummaryRow(
-                            label: 'Total Amount',
-                            value: _money(widget.bill.total),
+                          Expanded(
+                            child: _SummaryRow(
+                              label: 'Total Amount',
+                              value: _money(widget.bill.total),
+                            ),
                           ),
-                          _SummaryRow(
-                            label: 'Paid',
-                            value: _money(widget.bill.paid),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _SummaryRow(
+                              label: 'Paid',
+                              value: _money(widget.bill.paid),
+                            ),
                           ),
-                          _SummaryRow(
-                            label: 'Balance Due',
-                            value: _money(widget.bill.balance),
-                            strong: widget.bill.balance > 0,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _SummaryRow(
+                              label: 'Balance Due',
+                              value: _money(widget.bill.balance),
+                              strong: widget.bill.balance > 0,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _SummaryRow(
+                              label: 'Total Pieces',
+                              value: '${widget.bill.totalPieces}',
+                            ),
                           ),
                         ],
                       ),
@@ -7441,6 +7525,14 @@ class _BillDetailsEditPageState extends State<_BillDetailsEditPage> {
                                     ),
                                     Text(
                                       '${line.productId} · ${line.quality}',
+                                      style: const TextStyle(
+                                        color: _muted,
+                                        fontSize: 11,
+                                        fontFamily: 'Arial',
+                                      ),
+                                    ),
+                                    Text(
+                                      '${line.pieces} pcs',
                                       style: const TextStyle(
                                         color: _muted,
                                         fontSize: 11,
@@ -8265,7 +8357,6 @@ class PendingItemsPage extends StatelessWidget {
 
 class _OrderDetailsPage extends StatelessWidget {
   const _OrderDetailsPage({
-    super.key,
     required this.order,
     required this.isCustomer,
     required this.bill,
@@ -9063,6 +9154,7 @@ class CustomersPage extends StatelessWidget {
     required this.pendingRequests,
     required this.products,
     required this.onPayment,
+    required this.onReceivePayment,
     required this.onDownload,
   });
   final List<Account> customers;
@@ -9071,6 +9163,7 @@ class CustomersPage extends StatelessWidget {
   final List<PendingRequest> pendingRequests;
   final List<Product> products;
   final void Function(Bill, double) onPayment;
+  final ValueChanged<Account> onReceivePayment;
   final ValueChanged<Bill> onDownload;
 
   @override
@@ -9174,6 +9267,14 @@ class CustomersPage extends StatelessWidget {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        onPressed: customerBills.any((bill) => bill.balance > 0)
+                            ? () => onReceivePayment(customer)
+                            : null,
+                        icon: const Icon(Icons.add_card_outlined, size: 16),
+                        label: const Text('Add Payment'),
                       ),
                       const SizedBox(width: 7),
                       const Icon(Icons.chevron_right, color: _muted),
@@ -9757,8 +9858,12 @@ class _SettingsPageState extends State<SettingsPage> {
   final _accountFormKey = GlobalKey<FormState>();
 
   late final _businessName = TextEditingController(text: widget.business.name);
-  late final _businessAddress = TextEditingController(text: widget.business.address);
-  late final _businessPhone = TextEditingController(text: widget.business.phone);
+  late final _businessAddress = TextEditingController(
+    text: widget.business.address,
+  );
+  late final _businessPhone = TextEditingController(
+    text: widget.business.phone,
+  );
 
   late final _userName = TextEditingController(text: widget.account.name);
   late final _userEmail = TextEditingController(text: widget.account.email);
@@ -9797,9 +9902,8 @@ class _SettingsPageState extends State<SettingsPage> {
       widget.account.password = _userPassword.text;
     }
     widget.onChanged();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account profile saved.')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Account profile saved.')));
   }
 
   Future<void> _pickAndSaveLogo() async {
@@ -9829,9 +9933,8 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update logo: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not update logo: $e')));
       }
     }
   }
@@ -9842,9 +9945,8 @@ class _SettingsPageState extends State<SettingsPage> {
       widget.business.logoUrl = null;
     });
     _autoSaveBusiness();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Logo reset to default.')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Logo reset to default.')));
   }
 
   @override
@@ -9861,7 +9963,8 @@ class _SettingsPageState extends State<SettingsPage> {
           subtitle: 'Store details and custom header logo',
           icon: Icons.storefront_outlined,
           expanded: _businessExpanded,
-          onToggle: () => setState(() => _businessExpanded = !_businessExpanded),
+          onToggle: () =>
+              setState(() => _businessExpanded = !_businessExpanded),
           child: Form(
             key: _businessFormKey,
             child: Column(
@@ -9909,7 +10012,8 @@ class _SettingsPageState extends State<SettingsPage> {
           subtitle: 'Inventory stock management, production, and support',
           icon: Icons.tune_outlined,
           expanded: _featuresExpanded,
-          onToggle: () => setState(() => _featuresExpanded = !_featuresExpanded),
+          onToggle: () =>
+              setState(() => _featuresExpanded = !_featuresExpanded),
           child: Column(
             children: [
               SwitchListTile.adaptive(
@@ -9923,9 +10027,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        value
-                            ? 'Stock management enabled.'
-                            : 'Stock management disabled. Orders/bills will bypass stock limits.',
+                        value ? 'Stock management enabled.' : 'Stock management disabled. Orders/bills will bypass stock limits.',
                       ),
                     ),
                   );
@@ -10001,10 +10103,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           const SizedBox(height: 2),
                           Text(
                             'Account ID: ${widget.account.id}',
-                            style: const TextStyle(
-                              color: _muted,
-                              fontSize: 12,
-                            ),
+                            style: const TextStyle(color: _muted, fontSize: 12),
                           ),
                         ],
                       ),
@@ -10075,7 +10174,9 @@ class _SettingsPageState extends State<SettingsPage> {
           shape: BoxShape.circle,
           border: Border.all(color: _gold, width: 2),
         ),
-        child: widget.business.logoBytes != null && widget.business.logoBytes!.isNotEmpty
+        child:
+            widget.business.logoBytes != null &&
+                widget.business.logoBytes!.isNotEmpty
             ? ClipOval(
                 child: Image.memory(
                   widget.business.logoBytes!,
@@ -10084,36 +10185,33 @@ class _SettingsPageState extends State<SettingsPage> {
                   height: 52,
                 ),
               )
-            : (widget.business.logoUrl != null && widget.business.logoUrl!.trim().isNotEmpty)
-                ? ClipOval(
-                    child: widget.business.logoUrl!.startsWith('data:image')
-                        ? Image.memory(
-                            base64Decode(widget.business.logoUrl!.split(',').last),
-                            fit: BoxFit.cover,
-                            width: 52,
-                            height: 52,
-                          )
-                        : Image.network(
-                            widget.business.logoUrl!,
-                            fit: BoxFit.cover,
-                            width: 52,
-                            height: 52,
-                            errorBuilder: (_, __, ___) => const Center(
-                              child: Icon(
-                                Icons.diamond_outlined,
-                                color: _gold,
-                                size: 26,
-                              ),
-                            ),
+            : (widget.business.logoUrl != null &&
+                  widget.business.logoUrl!.trim().isNotEmpty)
+            ? ClipOval(
+                child: widget.business.logoUrl!.startsWith('data:image')
+                    ? Image.memory(
+                        base64Decode(widget.business.logoUrl!.split(',').last),
+                        fit: BoxFit.cover,
+                        width: 52,
+                        height: 52,
+                      )
+                    : Image.network(
+                        widget.business.logoUrl!,
+                        fit: BoxFit.cover,
+                        width: 52,
+                        height: 52,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(
+                            Icons.diamond_outlined,
+                            color: _gold,
+                            size: 26,
                           ),
-                  )
-                : const Center(
-                    child: Icon(
-                      Icons.diamond_outlined,
-                      color: _gold,
-                      size: 26,
-                    ),
-                  ),
+                        ),
+                      ),
+              )
+            : const Center(
+                child: Icon(Icons.diamond_outlined, color: _gold, size: 26),
+              ),
       ),
       const SizedBox(width: 14),
       Expanded(
@@ -10145,7 +10243,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: const Icon(Icons.upload_file_outlined, size: 16),
                   label: const Text('Change Logo'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     textStyle: const TextStyle(fontSize: 12),
                   ),
                 ),
@@ -10159,7 +10260,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     label: const Text('Reset Logo'),
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.red,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
                       textStyle: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -10220,7 +10324,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
                 Icon(
-                  expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  expanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
                   color: _muted,
                 ),
               ],
@@ -10229,10 +10335,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         if (expanded) ...[
           const Divider(height: 1, color: _line),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: child,
-          ),
+          Padding(padding: const EdgeInsets.all(20), child: child),
         ],
       ],
     ),
@@ -11353,8 +11456,9 @@ class _TopBarState extends State<_TopBar> {
                                     },
                                   )
                                 : null,
-                            contentPadding:
-                                const EdgeInsets.symmetric(vertical: 8),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                            ),
                             isDense: true,
                           ),
                         ),
@@ -12224,9 +12328,7 @@ class _PMarkWidget extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
     width: size,
     height: size,
-    child: CustomPaint(
-      painter: _PMarkPainter(color: color),
-    ),
+    child: CustomPaint(painter: _PMarkPainter(color: color)),
   );
 }
 

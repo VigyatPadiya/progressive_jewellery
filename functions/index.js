@@ -401,11 +401,12 @@ exports.placeOrder = onCall({ region }, async (request) => {
     }
     const caller = callerSnapshot.data();
     const businessData = businessSnapshot.exists ? businessSnapshot.data() : {};
-    const stockManagementEnabled = request.data?.stockManagementEnabled === false
-      ? false
-      : (request.data?.stockManagementEnabled === true
-        ? true
-        : businessData.enableInventory === true);
+    // The store profile is the source of truth for inventory behavior. The
+    // client flag can disable stock checks for compatibility with older
+    // clients, but a stale client value must never re-enable them after the
+    // owner has disabled stock management in Settings.
+    const stockManagementEnabled = businessData.enableInventory === true
+      && request.data?.stockManagementEnabled !== false;
     const callerRole = String(caller.role ?? "customer").trim().toLowerCase();
     const customer = manualCustomerRef
       ? manualCustomerSnapshot.data()
