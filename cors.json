@@ -1,0 +1,12 @@
+
+[
+  {
+    "origin": [
+      "https://progressive-jewellery.web.app",
+      "https://progressive-jewellery.firebaseapp.com"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

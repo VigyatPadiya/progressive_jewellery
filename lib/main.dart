@@ -2688,11 +2688,11 @@ class _ShopShellState extends State<ShopShell> {
       drawer: desktop
           ? null
           : Drawer(
-              width: 280,
+              width: width < 500 ? (width * 0.85).clamp(290.0, 360.0) : 320,
               child: SafeArea(
                 child: _Sidebar(
-                  width: 280,
-                  compact: true,
+                  width: width < 500 ? (width * 0.85).clamp(290.0, 360.0) : 320,
+                  compact: false,
                   account: widget.account,
                   page: page,
                   pages: _pages,
@@ -11246,6 +11246,7 @@ class _AccessPage extends StatelessWidget {
 
 class _PageFrame extends StatelessWidget {
   const _PageFrame({
+    super.key,
     required this.eyebrow,
     required this.title,
     required this.description,
@@ -11259,52 +11260,82 @@ class _PageFrame extends StatelessWidget {
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    physics: const AlwaysScrollableScrollPhysics(),
-    padding: const EdgeInsets.fromLTRB(28, 30, 28, 35),
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 940),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _Overline(eyebrow),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: const TextStyle(fontSize: 31)),
-                      const SizedBox(height: 7),
-                      Text(
-                        description,
-                        style: const TextStyle(
-                          fontFamily: 'Arial',
-                          color: _muted,
-                          fontSize: 13,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (action != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 14, top: 2),
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isMobile = width < 600;
+
+    final headerText = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: isMobile ? 24 : 31,
+            fontWeight: FontWeight.bold,
+            height: 1.15,
+          ),
+        ),
+        if (description.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            description,
+            style: TextStyle(
+              fontFamily: 'Arial',
+              color: _muted,
+              fontSize: isMobile ? 12 : 13,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ],
+    );
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        isMobile ? 14 : 28,
+        isMobile ? 18 : 30,
+        isMobile ? 14 : 28,
+        isMobile ? 24 : 35,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 940),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Overline(eyebrow),
+              const SizedBox(height: 8),
+              if (isMobile) ...[
+                headerText,
+                if (action != null) ...[
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
                     child: action!,
                   ),
+                ],
+              ] else ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: headerText),
+                    if (action != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 14, top: 2),
+                        child: action!,
+                      ),
+                  ],
+                ),
               ],
-            ),
-            const SizedBox(height: 23),
-            child,
-          ],
+              const SizedBox(height: 23),
+              child,
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _EmptyState extends StatelessWidget {
@@ -11635,14 +11666,12 @@ class _Sidebar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: compact
-              ? const EdgeInsets.fromLTRB(15, 16, 12, 12)
-              : const EdgeInsets.fromLTRB(24, 27, 20, 34),
+          padding: EdgeInsets.fromLTRB(compact ? 18 : 24, 20, 18, 20),
           child: const _BrandLockup(light: true),
         ),
         Expanded(
           child: ListView(
-            padding: EdgeInsets.only(bottom: compact ? 8 : 12),
+            padding: const EdgeInsets.only(bottom: 12),
             children: _navigationSections
                 .map(
                   (section) => _SidebarSection(
@@ -11659,53 +11688,77 @@ class _Sidebar extends StatelessWidget {
           ),
         ),
         Padding(
-          padding: compact ? const EdgeInsets.all(9) : const EdgeInsets.all(15),
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: () => onSelect(
                 pages.contains(_Page.settings) ? _Page.settings : _Page.account,
               ),
-              borderRadius: BorderRadius.circular(13),
+              borderRadius: BorderRadius.circular(15),
               child: Container(
-                padding: EdgeInsets.all(compact ? 9 : 13),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .06),
-                  borderRadius: BorderRadius.circular(13),
+                  color: Colors.white.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.white.withValues(alpha: .12)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.account_circle_outlined,
-                      color: Color(0xFFD9BF8B),
-                      size: 20,
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: const Color(0xFF383227),
+                      foregroundColor: const Color(0xFFD9BF8B),
+                      child: Text(
+                        account.name.isEmpty
+                            ? 'U'
+                            : account.name[0].toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            account.name.isEmpty
-                                ? 'User account'
-                                : account.name,
+                            account.name.isEmpty ? 'User account' : account.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
                               fontFamily: 'Arial',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 3),
-                          Text(
-                            account.role.label,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: .56),
-                              fontFamily: 'Arial',
-                              fontSize: 10,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD9BF8B)
+                                      .withValues(alpha: .2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  account.role.label,
+                                  style: const TextStyle(
+                                    color: Color(0xFFD9BF8B),
+                                    fontFamily: 'Arial',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -11713,11 +11766,11 @@ class _Sidebar extends StatelessWidget {
                     IconButton(
                       tooltip: 'Sign out',
                       onPressed: onLogout,
-                      visualDensity: VisualDensity.compact,
+                      visualDensity: VisualDensity.comfortable,
                       icon: Icon(
                         Icons.logout,
-                        color: Colors.white.withValues(alpha: .75),
-                        size: 17,
+                        color: Colors.white.withValues(alpha: .85),
+                        size: 20,
                       ),
                     ),
                   ],
@@ -11785,15 +11838,15 @@ class _SidebarSection extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Padding(
-        padding: EdgeInsets.fromLTRB(compact ? 16 : 24, 10, 16, 5),
+        padding: const EdgeInsets.fromLTRB(20, 14, 16, 6),
         child: Text(
           title,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: .42),
+            color: Colors.white.withValues(alpha: .5),
             fontFamily: 'Arial',
-            fontSize: 9,
+            fontSize: 10,
             fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
+            letterSpacing: 1.3,
           ),
         ),
       ),
@@ -11867,9 +11920,9 @@ class _NavItem extends StatelessWidget {
   };
   @override
   Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.symmetric(
-      horizontal: compact ? 8 : 12,
-      vertical: compact ? 0 : 1,
+    padding: const EdgeInsets.symmetric(
+      horizontal: 10,
+      vertical: 2,
     ),
     child: Material(
       color: selected ? const Color(0xFF413B30) : Colors.transparent,
@@ -11878,28 +11931,28 @@ class _NavItem extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(11),
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? 8 : 13,
-            vertical: compact ? 2 : 7,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
           ),
           child: Row(
             children: [
               Icon(
                 _icon,
                 color: selected ? const Color(0xFFD9BF8B) : Colors.white70,
-                size: 19,
+                size: 20,
               ),
-              SizedBox(width: compact ? 10 : 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   _label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: selected ? Colors.white : Colors.white70,
+                    color: selected ? Colors.white : Colors.white.withValues(alpha: .82),
                     fontFamily: 'Arial',
-                    fontSize: compact ? 12 : 12,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    fontSize: 13.5,
+                    fontWeight: selected ? FontWeight.bold : FontWeight.w500,
                   ),
                 ),
               ),
